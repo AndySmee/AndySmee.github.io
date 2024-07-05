@@ -1,0 +1,1076 @@
+  body {
+    font-size: 15px;
+}
+    :root {
+      --batters-color: #ffffff;
+      --bowlers-color: #ffffff;
+      --batters-background-color: #5566ee;
+      --bowlers-background-color: #55aa88;
+      --extras-color: #000000;
+      --dot-color: #ffffff;
+      --dot-background-color: #aaaaaa;
+    }
+    
+    BODY {
+      height: 100vh;
+      overflow: hidden;
+      background-image: radial-gradient(#ffffff, #99999911, #99999933, #999999cc);
+    }
+    DIV {
+      border: 1px solid #000;
+      border-radius: 5px;
+      text-align: center;
+      vertical-align: middle;
+      font-family: 'Roboto, sans-serif';
+    }
+    #ballTrackers {
+      width: 100%;
+      height: 110px;
+      position: absolute;
+      background-color: #000000cc;
+      border: none;
+      border-radius: 0px;
+      padding: 4px;
+      top: 0px;
+      right: 0px;
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: column;
+      overflow-x: auto;
+      align-content: flex-start;
+    }
+    .ballTracker {
+      width: 156px;
+      height: 104px;
+      background-color: #ffffff;
+      border: none;
+      padding: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: row;
+      overflow-y: hidden;
+      align-content: flex-start;
+    }
+    #battersScoreBoard {
+      width: 100%;
+      height: 40px;
+      border: none;
+      position: absolute;
+      padding: 4px;
+      top: 117px;
+      left: 0px;
+      font-size: 12px;
+      display: flex;
+      flex-wrap: nowrap;
+      flex-direction: row;
+      justify-content: flex-start;
+      overflow-x: scroll;
+    }
+    #battersScoreBoards {
+      width: 100%;
+      height: 40px;
+      border: none;
+      position: absolute;
+      padding: 4px;
+      top: 156px;
+      left: 0px;
+      font-size: 12px;
+      display: flex;
+      flex-wrap: nowrap;
+      flex-direction: row;
+      --justify-content: flex-end;
+      overflow-x: scroll;
+    }
+    #battersScoreBoard::before {
+      content: attr(data-batters-score) ' / ' attr(data-wickets-fallen);
+      display: inline-block;
+      font-size: 24px;
+      font-weight: 600;
+      margin: 4px 8px 0px 4px;
+      min-width: 100px;
+      height: 28px; width: 72px;
+      --border: 2px solid var(--batters-background-color);
+      border-radius: 4px;
+      color: var(--batters-color);
+      background-color: var(--batters-background-color);
+      order: 1;
+    }
+    #battersScoreBoardEnd {
+      order: 999;
+    }
+    #fieldersScoreBoard {
+      width: 100%;
+      height: 40px;
+      border: none;
+      position: absolute;
+      padding: 4px;
+      top: 195px;
+      left: 0px;
+      font-size: 12px;
+      display: flex;
+      flex-wrap: nowrap;
+      flex-direction: row;
+      --justify-content: end;
+      overflow-x: scroll;
+    }
+    .batterScoreBoard {
+      width: 200px;
+      min-width: 200px;
+      height: 28px;
+      background-color: #ffffff;
+      border: none;
+      padding: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: row;
+      overflow-y: hidden;
+      --align-content: flex-end;
+    }
+    .extrasScoreBoard {
+      width: 250px;
+      min-width: 250px;
+      height: 28px;
+      background-color: #ffffff;
+      border: none;
+      padding: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: row;
+      overflow-y: hidden;
+      order: 11;
+      --align-content: flex-end;
+    }
+    .bowlerScoreBoard {
+      width: 150px;
+      min-width: 150px;
+      height: 28px;
+      background-color: #ffffff;
+      border: none;
+      padding: 4px;
+      text-align: right;
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: column;
+      overflow-y: hidden;
+      align-content: flex-start;
+    }
+    .batterScoreBoard::after {
+      content: attr(data-runs) ' (' attr(data-balls) ')';
+      display: inline-block;
+      font-size: 18px;
+      font-weight: 600;
+      margin: 4px 4px 0px 4px;
+      height: 28px;
+      text-align: right;
+      --border: 1px solid #000000;
+    }
+    .bowlerScoreBoard::after {
+      content: attr(data-wickets) ' / ' attr(data-runs);
+      display: inline-block;
+      font-size: 18px;
+      font-weight: 600;
+      margin: 4px 4px 0px 4px;
+      height: 28px;
+      text-align: right;
+      --width: 100px;
+      --border: 1px solid #000000;
+    }
+    .extrasScoreBoard::after {
+      content: 'NB:' attr(data-no-balls) ' WD:' attr(data-wides) ' B:' attr(data-byes) ' LB:' attr(data-leg-byes);
+      display: inline-block;
+      font-size: 18px;
+      font-weight: 600;
+      margin: 4px 4px 0px 4px;
+      height: 28px;
+      --border: 1px solid #000000;
+    }
+    #thisBall {
+      width: calc(100vw - 60px);
+      height: 85px;
+      background-color: #000000cc;
+      border: none;
+      border-radius: 0px;
+      position: absolute;
+      padding: 0px 60px 2px 2px;
+      bottom: -4px;
+      left: 0px;
+      font-size: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: row;
+      overflow-y: auto;
+      align-content: flex-end;
+    }
+    #levels {
+      width: calc(100vw - 370px);
+      height: calc(100vh - 90px - 48px - 48px - 118px - 5px);
+      border: none;
+      position: absolute;
+      padding: 0px 0px 0px 0px;
+      bottom: 90px;
+      left: 0px;
+      font-size: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .levels {
+      width: 40px;
+      height: 40px;
+      z-index: 100;
+      border: none;
+      opacity: 0.2;
+      color: #000000;
+    }
+    .levels .material-icons {
+      font-size: 30px;
+    }
+    .levels[data-badge="•"]::after {
+      background:var(--dot-background-color);
+      color: var(--dot-color);
+    }
+    .levels[data-badge="WK"]::after {
+      font-size: 11px;
+      background:linear-gradient( var(--bowlers-background-color) 45%, var(--bowlers-background-color) 55%);
+      color: var(--bowlers-color);
+    }
+    .levels[data-badge="1"]::after {
+      background:linear-gradient( var(--batters-background-color) 45%, var(--batters-background-color) 55%);
+      color: var(--batters-color);
+    }
+    .levels[data-badge="4"]::after {
+      background:linear-gradient( var(--batters-background-color) 45%, var(--batters-background-color) 55%);
+      color: var(--batters-color);
+    }
+    .levels[data-badge="WD"]::after {
+      font-size: 11px;
+      background:linear-gradient( var(--extras-color) 45%, var(--extras-color) 55%);
+      color: #ffffff;
+    }
+    .levels[data-badge="NB"]::after {
+      font-size: 11px;
+      background:linear-gradient( var(--extras-color) 45%, var(--extras-color) 55%);
+      color: #ffffff;
+    }
+    .levels[data-badge="x"]::after {
+      font-size: 11px;
+      background:linear-gradient( #ffffff 45%, #ffffff 55%);
+      color: #000000;
+    }
+    .levels::after {
+      position: absolute;
+      display: block;
+      content: attr(data-badge);
+      width: 16px;
+      height: 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-top: -16px;
+      margin-left: 18px;
+      padding: 2px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 15px;
+    }
+    #levelDescription {
+      position: absolute;
+      display: none;
+      top: 25px;
+      left: 5px;
+      width: 180px;
+      padding: 4px;
+      background:linear-gradient( to bottom, #bcc6cc, #eeeeee80, #bcc6cc);
+      color: #000000;
+      border: none;
+      z-index: 100;
+    }
+    #undo {
+      width: 50px;
+      height: 28px;
+      background-color: #ffffff;
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      bottom: 35px;
+      right: 5px;
+    }
+    #switch {
+      width: 50px;
+      height: 28px;
+      background-color: var(--batters-background-color);
+      color: var(--batters-color);
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      bottom: 220px;
+      right: 5px;
+    }
+    #home {
+      width: 50px;
+      height: 28px;
+      background-image: linear-gradient(90deg, var(--batters-background-color) 49%, var(--bowlers-background-color) 51%);
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      top: 240px;
+      right: 5px;
+    }
+    #color {
+      width: 50px;
+      height: 28px;
+      background-image: linear-gradient(45deg, var(--batters-background-color) 49%, var(--bowlers-background-color) 51%);
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      bottom: 370px;
+      right: 5px;
+    }
+    #report {
+      width: 50px;
+      height: 28px;
+      background-color: ffffff;
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      bottom: 170px;
+      right: 5px;
+      display: none;
+    }
+    #shareBowlers {
+      width: 50px;
+      height: 28px;
+      background-color: var(--bowlers-background-color);
+      color: var(--bowlers-color);
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      bottom: 145px;
+      right: 5px;
+    }
+    #shareBatters {
+      width: 50px;
+      height: 28px;
+      background-color: var(--batters-background-color);
+      color: var(--batters-color);
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      bottom: 100px;
+      right: 5px;
+    }
+    #ballEntry {
+      width: 360px;
+      height: 360px;
+      position: absolute;
+      top: 240px;
+      right: 10px;
+      border-radius: 40px;
+      --border: 1px solid #eeeeee;
+      background-color: #ffffff;
+      z-index: 0;
+    }
+    #touchCanvas {
+      width: 360px;
+      height: 360px;
+      position: absolute;
+      top: 240px;
+      right: 10px;
+      background-color: #00000000;
+    }
+    #straightUmpire {
+      width: 100%;height: 60px;
+      position: absolute;
+      top: 300px;left: 0px;
+    }
+    #nonstriker {
+      position: absolute;
+      top: -15px;left: 0px;
+      opacity: 0.2;
+    }
+    #nonstrikersName {
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+    .bowlerControls {
+      position: absolute;
+      width: 30px;
+      height: 22px;
+      padding: 4px 0px 4px 0px;
+      top: 19px;
+      border: none;
+    }
+    #bowlerPrevious {
+      left: 90px;
+      text-align: right;
+    }
+    #bowlerNext {
+      left: 240px;
+      text-align: left;
+    }
+    #bowler {
+      position: absolute; 
+      top: 10px; left: 90px;
+      width: 180px; height: 50px;
+      border-radius: 30px;
+      border: none;
+      background-color: var(--bowlers-background-color);
+      color: var(--bowlers-color);
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .bowlerName::before {
+      content: attr(data-bowler-name);
+    }
+    #noBall {
+      width: 60px;height: 30px;
+      position: absolute;
+      top: 15px;left: 75px;
+      padding-top: 2px;
+      font-size: 14px;
+      line-height: 14px;
+      opacity: 0.2;
+    }
+    #wide {
+      width: 60px; height: 28px;
+      position: absolute;
+      top: 15px;left: 225px;
+      padding-top: 6px;
+    }
+    #nonstrikersWicket {
+      position: absolute;
+      top: 25px;left: 150px;
+      background-color: var(--bowlers-background-color);
+      opacity: 0.2;
+      color: var(--bowlers-color);
+    }
+    #nonstrikersCrease {
+      width: 100%;height: 60px;
+      position: absolute;
+      top: 250px;left: 0px; 
+    }
+    #sillyInfield {
+      width: 100%;height: 60px;
+      position: absolute;
+      top: 200px;left: 0px; 
+    }
+    #plusThree {
+      width: 74px;height: 50px;
+      position: absolute;
+      top: 0px;left: 223px;
+      opacity: 0;
+    }
+    #plusOne {
+      width: 74px;height: 50px;
+      position: absolute;
+      top: 0px;left: 143px;
+      opacity: 0;
+    }
+    #strikersCrease {
+      width: 100%;height: 60px;
+      position: absolute;
+      top: 120px;left: 0px;
+    }
+    #striker {
+      position: absolute;
+      top: -15px;left: 143px;
+    }
+    #strikersName {
+      padding-left: 8px;
+      padding-right: 8px;
+      padding-top: 8px;
+    }
+    #legBye {
+      width: 60px;height: 28px;
+      position: absolute;
+      top: 10px;left: 225px;
+      padding-top: 6px;
+      opacity: 0.2;
+    }
+    #bye {
+      width: 60px;height: 28px;
+      position: absolute;
+      top: 10px;left: 75px;
+      padding-top: 6px;
+      opacity: 0.2;
+    }
+    #strikersWicket {
+      position: absolute;
+      top: 55px;left: 150px;
+      background-color: var(--bowlers-background-color);
+      color: var(--bowlers-color);
+    }
+    #plusTwo {
+      width: 74px;height: 50px;
+      position: absolute;
+      top: 55px;left: 63px;
+      opacity: 0;
+    }
+    #plusSix {
+      width: 64px;height: 50px;
+      position: absolute;
+      top: 0px;left: 10px;
+      opacity: 0;
+    }
+    #plusFour {
+      width: 64px;height: 50px;
+      position: absolute;
+      top: 0px;left: 286px;
+      opacity: 0;
+    }
+    #closeInfield {
+      width: 100%;height: 60px;
+      position: absolute;
+      top: 0px;left: 0px;
+    }
+    #field {
+      width: 60px;height: 40px;
+      position: absolute;
+      top: 0px;left: 80px;
+      background-color: var(--bowlers-background-color);
+      border: none;
+      color: var(--bowlers-color);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    #wicketKeeper {
+      width: 80px;height: 40px;
+      position: absolute;
+      top: 0px;left: 140px;
+      background-color: var(--bowlers-background-color);
+      border: none;
+      color: var(--bowlers-color);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .hidden {
+      border: none;
+    }
+    .nudged {
+      margin-top: 16pxp
+    }
+    .halfNudged {
+      margin-top: 12px;
+    }
+    .wides {
+      background-color: var(--extras-color);
+      border: none;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .byes {
+      background-color: #cccccc;
+      border: none;
+      color: #000000;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .wickets {
+      border: none; padding-top: 5px;
+      width: 60px; height: 35px;
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .batters {
+      width: 74px; height: 74px;
+      border: none;
+      border-radius: 37px;
+      background-color: var(--batters-background-color);
+      color: var(--batters-color);
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .batterName::before {
+      content: attr(data-batter-name);
+    }
+    .runs {
+      width: 80px; height: 80px;
+      border: none;
+      border-radius: 40px;
+      color: var(--batters-color);
+      font-size: 18px;
+      font-weight: 600;
+      background-color: var(--batters-background-color);
+    }
+    .batters.offstrike {
+      width: 60px; height: 60px;
+      border: none;
+      border-radius: 30px;
+      background-color: var(--batters-background-color);
+      color: var(--batters-color);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .nonstrikers {
+      border: none;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .balls {
+      width: 28px;height: 28px;
+      min-width: 28px;
+      border: none;
+      border-radius: 22px;
+      background-color: var(--batters-background-color);
+      color: var(--batters-color);
+      font-size: 24px;
+      font-weight: 600;
+      margin: 4px;
+      padding: 8px;
+    }
+    .balls[data-edited="true"]::after {
+      position: absolute;
+      display: block;
+      content: "↑↓";
+      width: 16px;
+      height: 16px;
+      border-radius: 10px;
+      background-color: #000000;
+      font-size: 12px;
+      margin-top: -10px;
+      margin-left: 24px;
+      padding: 2px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 15px;
+    }
+    .balls.proxy {
+      background-color: #cccccc;
+      opacity: 0.4;
+    }
+    .balls.proxy.last {
+      background-color: #800000;
+      opacity: 0.4;
+    }
+    .balls.wicket {
+      background-color: var(--bowlers-background-color);
+      color: var(--bowlers-color);
+    }
+    .balls.wide {
+      background-color: var(--extras-color);
+      font-size: 15px;
+      line-height: 15px;
+      color: #ffffff;
+    }
+    .balls.byes {
+      background-color: var(--batters-background-color);
+      font-size: 15px;
+      line-height: 15px;
+      color: var(--batters-color);
+    }
+    .balls.mixed {
+      background-image: linear-gradient(var(--extras-color) 50%, var(--batters-background-color) 55%);
+      font-size: 15px;
+      line-height: 15px;
+      color: #ffffff;
+    }
+    .balls.mixed.wicket {
+      background-image: linear-gradient(var(--extras-color) 50%, var(--bowlers-background-color) 55%);
+      font-size: 15px;
+      line-height: 15px;
+      padding: none;
+      color: #ffffff;
+    }
+    .balls.triple.wicket {
+      background-image: linear-gradient(var(--extras-color) 42%, var(--batters-background-color) 44%, var(--batters-background-color) 69%, var(--bowlers-background-color) 73%);
+      color: #ffffff;
+      font-size: 12px;
+      line-height: 12px;
+      padding: none;
+    }
+    .balls.blbw {
+      background-image: linear-gradient(var(--batters-background-color) 50%, var(--bowlers-background-color) 55%);
+      font-size: 15px;
+      line-height: 15px;
+      color: #ffffff;
+    }
+    .balls.extra.wicket {
+      background-color: var(--bowlers-background-color);
+      font-size: 15px;
+      line-height: 15px;
+      padding: none;
+      color: var(--bowlers-color);
+    }
+    .dot {
+      background-color: var(--dot-background-color);
+      color: var(--dot-color);
+    }
+    .action {
+      height: 16px;
+      min-width: 16px;
+      border: none;
+      border-radius: 2px;
+      margin: 2px;
+      padding: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .marker {
+      background-color: #ffffff;
+      font-weight: 600;
+    }
+    .reversed {
+      background-color: #000000;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .bowling {
+      background-color: var(--bowlers-background-color);
+      color: var(--bowlers-color);
+      font-weight: 600;
+    }
+    .batting {
+      background-color: var(--batters-background-color);
+      color: var(--batters-color);
+    }
+    .extras {
+      background-color: var(--extras-color);
+      color: #ffffff;
+    }
+    .overs {
+      width: 44px; height: 44px;
+      border: none;
+      padding: 4px;
+      max-width: 44px;
+      color: #ffffff;
+      text-align: center;
+      font-size: 36px;
+      font-weight: 600;
+    }
+    .overBowlers {
+      position: absolute;
+      bottom: 5px;
+      width: 30px;height: 30px;
+      min-width: 15px;
+      border: none;
+      border-radius: 20px;
+      font-size: 15px;
+      line-height: 15px;
+      padding: 3px;
+      font-weight: 600;
+      margin: 4px;
+      background-color: var(--bowlers-background-color);
+      color: var(--bowlers-color);
+    }
+    .overBowlers::before {
+      content: attr(data-bowler-in);
+    }
+    .overBowlers::after {
+      content: attr(data-bowler-initials);
+    }
+    #bowlerModal {
+      width: 100%;
+      height: 180px;
+      top: calc(100% - 180px);
+      left: 0px;
+      position: absolute;
+      background-color: #ffffffee;
+      display: none;
+      overflow-y: auto;
+    }
+    #bowlerTextEntry {
+      width: calc(100% - 10px);
+      height: 70px;
+      position: absolute;
+      left: 10px;
+      top: 60px;
+      border: none;
+      margin-bottom: 5px;
+      padding-left: 10px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    #batterModal {
+      width: 100%;
+      height: 180px;
+      top: calc(100% - 180px);
+      left: 0px;
+      position: absolute;
+      background-color: #ffffffee;
+      display: none;
+      overflow-y: auto;
+    }
+    #batterTextEntry {
+      width: calc(100% - 10px);
+      height: 70px;
+      position: absolute;
+      left: 10px;
+      top: 60px;
+      border: none;
+      margin-bottom: 5px;
+      padding-left: 10px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    #ballModal {
+      width: 360px;
+      height: 270px;
+      top: 120px;
+      left: calc(calc(100% - 360px)/2);
+      position: absolute;
+      background-color: #ffffffee;
+      display: none;
+      
+    }
+    #entryModal {
+      width: 360px;
+      height: 540px;
+      top: 40px;
+      left: calc(calc(100% - 360px)/2);
+      position: absolute;
+      background-color: #ffffffee;
+      display: none;
+    }
+    #entryResumeButton::after {
+      content: 'Resume ' attr(data-mode) ' Match';
+    }
+    #entryResumeButton {
+      position: absolute;
+      display: block;
+      top: 60px;
+      left: 20px;
+      width: 130px;
+      height: 125px;
+      padding: 10px;
+      font-size: 22px;
+      background:linear-gradient( to bottom, #bcc6cc, #eeeeee80, #bcc6cc);
+      color: #000000;
+      border: none;
+    }
+    #entryNewPairsButton::after {
+      content: 'New Pairs Match';
+    }
+    #entryNewPairsButton {
+      position: absolute;
+      display: block;
+      top: 220px;
+      left: 20px;
+      width: 130px;
+      height: 125px;
+      padding: 10px;
+      font-size: 22px;
+      background:linear-gradient( to bottom, #bcc6cc, #eeeeee80, #bcc6cc);
+      color: #000000;
+      border: none;
+    }
+    #entryNewNoReplayButton::after {
+      content: 'New No Replay Match';
+    }
+    #entryNewNoReplayButton {
+      position: absolute;
+      display: block;
+      top: 220px;
+      left: 190px;
+      width: 130px;
+      height: 125px;
+      padding: 10px;
+      font-size: 22px;
+      background:linear-gradient( to bottom, #bcc6cc, #eeeeee80, #bcc6cc);
+      color: #000000;
+      border: none;
+    }
+    #entryNewHundredButton::after {
+      content: 'New Hundred Match';
+    }
+    #entryNewHundredButton {
+      position: absolute;
+      display: block;
+      top: 380px;
+      left: 20px;
+      width: 130px;
+      height: 125px;
+      padding: 10px;
+      font-size: 22px;
+      background:linear-gradient( to bottom, #bcc6cc, #eeeeee80, #bcc6cc);
+      color: #000000;
+      border: none;
+    }
+    #entryNewButton::after {
+      content: 'New Standard Match';
+    }
+    #entryNewButton {
+      position: absolute;
+      display: block;
+      top: 380px;
+      left: 190px;
+      width: 130px;
+      height: 125px;
+      padding: 10px;
+      font-size: 22px;
+      background:linear-gradient( to bottom, #bcc6cc, #eeeeee80, #bcc6cc);
+      color: #000000;
+      border: none;
+    }
+    #entrySwapButton::after {
+      content: 'Swap Innings';
+    }
+    #inning {
+      width: 50px;
+      height: 28px;
+      background-image: linear-gradient(90deg, var(--batters-background-color) 49%, var(--bowlers-background-color) 51%);
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      top: 95px;
+      left: 50px;
+    }
+    #resume {
+      width: 50px;
+      height: 28px;
+      background-image: linear-gradient(90deg, var(--batters-background-color) 49%, var(--bowlers-background-color) 51%);
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      top: 95px;
+      left: 50px;
+    }
+    #new, #newPairs, #newNoReplay, #newHundred {
+      width: 50px;
+      height: 28px;
+      background-image: linear-gradient(90deg, var(--batters-background-color) 49%, var(--bowlers-background-color) 51%);
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 600;
+      position: absolute;
+      padding: 8px 0px 4px 0px;
+      top: 95px;
+      left: 50px;
+    }
+    #entrySwapButton {
+      position: absolute;
+      display: block;
+      top: 60px;
+      left: 190px;
+      width: 130px;
+      height: 125px;
+      padding: 10px;
+      font-size: 22px;
+      background:linear-gradient( to bottom, #bcc6cc, #eeeeee80, #bcc6cc);
+      color: #000000;
+      border: none;
+    }
+    #shareModal {
+      width: 340px;
+      height: 680px;
+      top: 20px;
+      left: calc(calc(100% - 360px)/2);
+      position: absolute;
+      background-color: #ffffffee;
+      display: none;
+      overflow-y: auto;
+    }
+    #colorModal {
+      width: 300px;
+      height: 600px;
+      top: 40px;
+      left: calc(calc(100% - 300px)/2);
+      position: absolute;
+      --background-image: linear-gradient(0deg, var(--batters-background-color) 49%, #000000 50%, var(--bowlers-background-color) 51%);
+      --background-color: #000000;
+      color: #ffffff;
+      display: none;
+      flex-wrap: wrap;
+      flex-direction: row;
+      overflow-y: auto;
+      align-content: flex-start;
+    }
+    .colorOverlays {
+      width: 20px;
+      height: 20px;
+      border: none;
+      padding: 20px;
+      border-radius: 22px;
+      
+    }
+    #ballDetails {
+      width: 340px;
+      position: absolute;
+      left: 0px;
+      top: 60px;
+      border: none;
+      text-align: left;
+      margin-bottom: 5px;
+      padding-left: 10px;
+      font-size: 16px;
+      overflow-y: scroll;
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: row;
+      overflow-y: auto;
+      align-content: flex-end;
+    }
+    .ballItems {
+      border: none;
+      text-align: left;
+      padding: 10px;
+    }
+    #ballDecision {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    #shareDetails {
+      width: 340px;
+      position: absolute;
+      left: 10px;
+      top: 50px;
+      border: none;
+      text-align: left;
+      margin-bottom: 5px;
+      padding-left: 10px;
+      font-size: 16px;
+      overflow-y: scroll;
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: row;
+      overflow-y: auto;
+      align-content: flex-end;
+    }
+    #modalOverlay {
+      position:absolute;
+      width: 100%;
+      left: 0px;
+      height: 100vh;
+      top: 0px;
+      background-color: #000000cc;
+      display: none;
+    }
+    .modals::after {
+      position: absolute;
+      content: attr(data-modal-title);
+      font-weight: 600;
+      text-align: left;
+      left: 0px;
+      font-size: 24px;
+      margin: 20px;
+    }
+    .closeIcons {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: calc(100% - 60px);
+      margin: none;
+      padding: 20px;
+      text-align: right;
+      color: #333333;
+      border: none;
+    }
+    #ballModalBall {
+      left: calc(100% - 70px);
+      width: 30px;
+      padding: 5px;
+    }

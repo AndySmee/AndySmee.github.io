@@ -1,0 +1,2111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scratch Match</title>
+  
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="hints.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet">
+  <script language="javascript">
+    var isBowling = false;
+    var isBatter, isOffstrike = false;
+    var isStriking, isNoBall, isWide, isBye, isLegBye = false;
+    var isStrikingWicket, isWithField, isWicketKeeping, isStrikingNonstrikersWicket = false;
+    var isWithPlusThree, isWithPlusOne, isWithPlusTwo, isWithPlusSix, isWithPlusFour = false;
+    var ballEntryOffsetRight = 0;
+    var isFirstBatterOnstrike = true;
+    var ballCount = 1, overCount = 1, overBallCount = 1, overValidBallCount = 0, firstBatterOnStrike = 1, secondBatterOnstrike = 2;
+    var battersCount = 0, bowlersCount = 0, bowlerIn = 0, inningsCount = 0;
+    
+    var settings = {
+      mode: 'Standard',
+      lastOver: -1
+    };
+    //const mode = 'Hundred'; // 'Hundred'
+    try {
+      const storedSettings = JSON.parse(localStorage.getItem('Settings'));
+      console.log('Settings from storage', 'Mode', storedSettings.mode);
+      //if that worked commit it
+      settings = storedSettings;
+    } catch {
+      // no mode stored
+      localStorage.setItem('Settings',JSON.stringify(settings));
+      console.log('Standard settings stored');
+    }
+    
+    //settings
+    function ballsPerOver() {
+      return settings.mode == 'Hundred'? 5 : 6; //hundred rules
+    }
+    function battersSwap(overIndex) {
+      const everyOver = settings.mode == 'Hundred'? false: true; //not hundred rules
+      return (overIndex / 2 != Math.trunc(overIndex / 2)) || everyOver;
+    }
+    function noBallPenalty() { // decision rule
+      switch(settings.mode) {
+        case 'Pairs': 
+        case 'No Replay':
+          return (settings.lastOver == overCount)? 1: 2;
+        default: return 1;
+      }
+        
+    }
+    function widePenalty() { // decision rule
+      switch(settings.mode) {
+        case 'Pairs': 
+        case 'No Replay':
+          return (settings.lastOver == overCount)? 1: 2;
+        default: return 1;
+      }
+    }
+    function wicketPenalty() {  //net score
+      switch(settings.mode) {
+        case 'Pairs': return 5;
+        default: return 0;
+      }
+    }
+    function wideIsValidBall() {
+      switch(settings.mode) {
+        case 'Pairs': 
+        case 'No Replay':
+          return (settings.lastOver == overCount)? false: true;
+        default: return false;
+      }
+    }
+    function noBallIsValidBall() {
+      switch(settings.mode) {
+        case 'Pairs': 
+        case 'No Replay':
+          return (settings.lastOver == overCount)? false: true;
+        default: return false;
+      }
+    }
+    
+    function oversPerPair() {
+      return 3;
+    }
+    
+    function setLastOver(lastOver) {
+      settings.lastOver = lastOver;
+      localStorage.setItem('Settings', JSON.stringify(settings));
+      console.log('LastOver stored', settings.lastOver);
+      refreshProxies();
+    }
+    
+    var rootStyles = getComputedStyle(document.querySelector(':root'));
+    var battersColor = rootStyles.getPropertyValue('--batters-color');
+    var bowlersColor = rootStyles.getPropertyValue('--bowlers-color');
+    var battersBackgroundColor = rootStyles.getPropertyValue('--batters-background-color');
+    var bowlersBackgroundColor = rootStyles.getPropertyValue('--bowlers-background-color');
+    
+    function getBowler(bowlerIndex, initials) {
+      const bowlerName = document.getElementById('bowlerName' + bowlerIndex).dataset.bowlerName;
+      if(!initials) {
+        return bowlerName;
+      } else {
+        var matches = bowlerName.match(/\b(\w)/g);
+        return matches.join('').toUpperCase();
+      }
+    }
+    
+    function getBatter(batterIndex, initials) {
+      const batterName = document.getElementById('batterName' + batterIndex).dataset.batterName;
+      if(!initials) {
+        return batterName;
+      } else {
+        var matches = batterName.match(/\b(\w)/g);
+        return matches.join('').toUpperCase();
+      }
+    }
+    
+    function getEnviron() {
+      return {
+          isBowling: isBowling,
+          isStriking: isStriking,
+          isNoBall: isNoBall,
+          isWide: isWide,
+          isBye: isBye,
+          isLegBye: isLegBye,
+          isWicketKeeping: isWicketKeeping,
+          isWithField: isWithField,
+          isStrikingWicket: isStrikingWicket,
+          isStrikingNonstrikersWicket: isStrikingNonstrikersWicket,
+          isWithPlusOne: isWithPlusOne,
+          isWithPlusTwo: isWithPlusTwo,
+          isWithPlusFour: isWithPlusFour,
+          isWithPlusSix: isWithPlusSix,
+          isOffstrike: isOffstrike,
+        }
+    }
+    function getGame() {
+      return {
+          isFirstBatterOnstrike: isFirstBatterOnstrike,
+          firstBatterOnStrike: firstBatterOnStrike,
+          secondBatterOnstrike: secondBatterOnstrike,
+          overBallCount: overBallCount,
+          overValidBallCount: overValidBallCount,
+          overCount: overCount,
+          ballCount: ballCount,
+          bowlerIn: bowlerIn
+        }
+    }
+    
+    function show() {
+      for (var i = 0, j = arguments.length; i < j; i++){
+        arguments[i].style.opacity = 1;
+      }
+    }
+    function hide() {
+      for (var i = 0, j = arguments.length; i < j; i++){
+        arguments[i].style.opacity = 0;
+      }
+    }
+    function shade() {
+      for (var i = 0, j = arguments.length; i < j; i++){
+        arguments[i].style.opacity = 0.4;
+      }
+    }
+  
+    function startup(inGame) {
+      if(inGame == true) {
+        console.log("Startup new match...");
+      
+      } else {
+        const el = document.getElementById("touchCanvas");
+        el.addEventListener("touchstart", handleStart);
+        el.addEventListener("touchend", handleEnd);
+        //el.addEventListener("touchcancel", handleCancel);
+        el.addEventListener("touchmove", handleMove);
+        console.log("Startup...");
+        showEntryModal();
+      }
+      resetStrikersCrease();
+      resetInfield(true);
+      resetCloseInfield();
+      resetBowling();
+      newExtrasScoreBoard();
+      storeBatters(true);
+      newBatter(true);
+      newBatter(false);
+      newOver();
+      storeBowlers(true);
+      
+      storeBalls(true);
+      showReady(true);
+      //showHint('bowlerHint'); //needs moving todo
+    }
+    
+    function showEntryModal() {
+      document.getElementById('modalOverlay').style.display = 'block';
+      const shareModal = document.getElementById('entryModal');
+      shareModal.dataset.modalTitle = 'Scratch Match';
+      document.getElementById('entryResumeButton').dataset.mode =  settings.mode;
+      shareModal.style.display = 'block';
+    }
+    
+    function newMatch(mode) {
+      localStorage.clear();
+      console.log('Localstorage cleared');
+      ballCount = 1, overCount = 1, overBallCount = 1, overValidBallCount = 0, firstBatterOnStrike = 1, secondBatterOnstrike = 2;
+      battersCount = 0, bowlersCount = 0, bowlerIn = 0;
+      inningsCount = 0;
+      setLastOver(mode=='Hundred'? 20: -1);
+      resetStrikersCrease();
+      resetInfield(true);
+      resetCloseInfield();
+      resetBowling();
+      
+      const battersScoreBoard = document.getElementById('battersScoreBoard');
+      battersScoreBoard.innerHTML = '<div class="hidden" id="battersScoreBoardEnd"></div>';
+      const scoreBoard = document.getElementById('battersScoreBoards');
+          scoreBoard.innerHTML = '';
+      battersScoreBoard.dataset.battersScore = 0;
+      battersScoreBoard.dataset.wicketsFallen = 0;
+      document.getElementById('fieldersScoreBoard').innerHTML = '';
+      document.getElementById('ballTrackers').innerHTML = '';
+      settings.mode = mode;
+      localStorage.setItem('Settings', JSON.stringify(settings));
+      hideModals();
+      startup(true);
+    }
+    
+    function swapInnings() {
+      hideModals();
+      if(inningsCount == 1) {
+        var innings = [];
+        var inning = {
+          balls: [],
+          battersScoreboard: {},
+          batters: [],
+          batterScoreboards: [],
+          extrasScoreboard: {},
+          bowlers: [],
+          bowlerScoreboards: []
+        }
+        inning.balls = JSON.parse(localStorage.getItem('Balls'));
+        inning.battersScoreboard = document.getElementById('battersScoreBoard').dataset;
+        inning.batters = JSON.parse(localStorage.getItem('Batters'));
+        for(i=1; i<battersCount; i++) {
+          try {
+            inning.batterScoreboards.push(document.getElementById('batterScoreBoard' + i).dataset);
+          } catch {};
+        }
+        inning.extrasScoreboard = document.getElementById('extrasScoreBoard1').dataset;
+        inning.bowlers = JSON.parse(localStorage.getItem('Bowlers'));
+        for(i=1; i<bowlersCount; i++) {
+          try {
+            inning.bowlerScoreboards.push(document.getElementById('bowlerScoreBoard' + i).dataset);
+          } catch {};
+        }
+        console.log(inning);
+        innings.push(inning);
+        localStorage.setItem('Innings', JSON.stringify(innings));
+        
+      // clear balls
+      localStorage.setItem('Balls', JSON.stringify([]));
+      
+      // create bowlers and batters
+      var newBowlers = [];
+      for(b=1; b<=battersCount; b++) {
+          newBowlers.push(getBatter(b));
+        }
+      localStorage.setItem('Bowlers', JSON.stringify(newBowlers));
+      
+      var newBatters = [];
+      for(b=1; b<=bowlersCount; b++) {
+          newBatters.push(getBowler(b));
+        }
+      localStorage.setItem('Batters', JSON.stringify(newBatters));
+        
+      //swap colours
+      battersBackgroundColor = rootStyles.getPropertyValue('--batters-background-color');
+      bowlersBackgroundColor = rootStyles.getPropertyValue('--bowlers-background-color');
+      document.documentElement.style.setProperty('--batters-color', bowlersColor);
+      document.documentElement.style.setProperty('--bowlers-color', battersColor);
+      document.documentElement.style.setProperty('--batters-background-color', bowlersBackgroundColor);
+      document.documentElement.style.setProperty('--bowlers-background-color', battersBackgroundColor);
+      
+      console.log("New inning...");
+      
+      console.log('Batters to bowlers', battersCount);
+      console.log('Bowlers to batters', bowlersCount);
+      ballCount = 1, overCount = 1, overBallCount = 1, overValidBallCount = 0, firstBatterOnStrike = 1, secondBatterOnstrike = 2;
+      battersCount = 0, bowlersCount = 0, bowlerIn = 0;
+      resetStrikersCrease();
+      resetInfield(true);
+      resetCloseInfield();
+      resetBowling();
+      
+      const battersScoreBoard = document.getElementById('battersScoreBoard');
+      battersScoreBoard.innerHTML = '<div class="hidden" id="battersScoreBoardEnd"></div>';
+      battersScoreBoard.dataset.battersScore = 0;
+      battersScoreBoard.dataset.wicketsFallen = 0;
+      const battersScoreBoards = document.getElementById('battersScoreBoards');
+      battersScoreBoards.innerHTML = '';
+      document.getElementById('fieldersScoreBoard').innerHTML = '';
+      document.getElementById('ballTrackers').innerHTML = '';
+      
+      newExtrasScoreBoard();
+      storeBatters(true);
+      newBatter(true);
+      newBatter(false);
+      newOver();
+      storeBowlers(true);
+      storeBalls(true);
+      showReady(true);
+      //showHint('bowlerHint');
+      }
+    }
+    
+    function blendColor(r0, g0, b0, alpha, isBatterColor) {
+      var r1 = 0;
+      var g1 = 0;
+      var b1 = 0;
+      var a = alpha/255;
+      if(isBatterColor) {
+        r1 = 85;
+        g1 = 102;
+        b1 = 238;
+      } else {
+        r1 = 85;
+        g1 = 170;
+        b1 = 136;
+      }
+      r = Math.round(((1 - a) * r1) + (a * r0));
+      g = Math.round(((1 - a) * g1) + (a * g0));
+      b = Math.round(((1 - a) * b1) + (a * b0));
+      return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+    }
+    
+    function colorSwatch(r0, g0, b0, alpha, isBatterColor, tag) {
+      var colorVariable = isBatterColor? '--batters-background-color': '--bowlers-background-color';
+      return '<div class="colorOverlays" style="background-color:' + blendColor(r0, g0, b0, alpha, isBatterColor) + '" onclick="document.documentElement.style.setProperty(\'' + colorVariable + '\', \'' + blendColor(r0, g0, b0, alpha, isBatterColor) + '\');">' + alpha + ' ' + tag + '</div>'
+    }
+    
+    function pickColor() {
+      document.getElementById('modalOverlay').style.display = 'block';
+      const colorModal = document.getElementById('colorModal');
+      colorModal.style.display = 'flex';
+      
+      var isBatterColor = false;
+      colorModal.innerHTML += '<div class="colorOverlays bowling">Field</div>';
+      for(j=0; j<2; j++) {
+      
+      for(i=1; i<4; i++) {
+        var alpha = (i * i * 16) + 48;
+        colorModal.innerHTML += colorSwatch(128, 128, 128, alpha, isBatterColor, 'W');
+        colorModal.innerHTML += colorSwatch(128, 0, 0, alpha, isBatterColor, 'R');
+        colorModal.innerHTML += colorSwatch(0, 128, 0, alpha, isBatterColor, 'G');
+        colorModal.innerHTML += colorSwatch(0, 0, 128, alpha, isBatterColor, 'B');
+        colorModal.innerHTML += colorSwatch(0, 128, 128, alpha, isBatterColor, 'C');
+        colorModal.innerHTML += colorSwatch(128, 0, 128, alpha, isBatterColor, 'M');
+        colorModal.innerHTML += colorSwatch(128, 128, 0, alpha, isBatterColor, 'Y');
+        colorModal.innerHTML += colorSwatch(0, 0, 0, alpha, isBatterColor, 'K');
+      }
+      isBatterColor = true;
+      colorModal.innerHTML += '<div class="colorOverlays batting">Bat</div>';
+      }
+      
+      
+      
+     
+    }
+    
+    function showHint(hintName) {
+      setTimeout(function() {
+        const hint = document.getElementById(hintName).dataset;
+        hint.showHint = true;
+        
+        const levels = document.getElementById('levels');
+        levels.innerHTML = '<div id="level'+ parseInt(hint.level) + '" class="levels" data-badge="' + hint.badge + '"><span class="material-icons">local_police</span></div>' + levels.innerHTML
+      }, 1000);
+    }
+    
+    function hideHint(hintName, sourceX, sourceY) {
+      const hint = document.getElementById(hintName).dataset;
+      
+      if(hint.showHint == "true") {
+        hint.showHint = false;
+
+        awardEP(hint.reward, sourceX, sourceY);
+          setTimeout(function() {
+            const level = document.getElementById('level' + parseInt(hint.level));
+            level.style.opacity = 1;
+            if(hint.nextHint != '') showHint(hint.nextHint);
+            const levelDescription = document.getElementById('levelDescription');
+            levelDescription.innerHTML = hint.description;
+            levelDescription.style.display = 'block';
+            //showHint('plusOneHint');
+            //showHint('plusFourHint');
+          }, 1500);
+      }
+    }
+    
+    function awardEP(starsCount, starLeft, starTop) {
+      for(i=0; i<starsCount; i++) {
+        const star = document.createElement("div");
+        
+        setTimeout(function() {
+          document.getElementById("ballEntry").appendChild(star);
+          star.outerHTML = '<div id="star' + i + '" class="stars gather" style="width: ' + (starLeft + (Math.random() * 80) - 60) + 'px; height: ' + (starTop + (Math.random() * 30) - 20) + 'px"><span class="material-icons">grade</span></div>';
+        }, Math.random() * 1000);
+        
+        setTimeout(function() {
+          console.log(i);
+          document.getElementById('star' + i).remove();
+        }, 2000);
+        
+      }
+    }
+
+    function removeStar(star) {
+      
+      setTimeout(function() {
+        console.log(star);
+        star.remove();
+      }, 3000);
+    }
+
+    document.addEventListener("DOMContentLoaded", startup);
+    
+    function incrementExtras(ballExtra, ballRuns, extraRuns) {
+      console.log('Inc extras', ballExtra, ballRuns, extraRuns);
+      if(extraRuns != 0) {
+        if(ballExtra.substring(0, 2) == 'NB') {
+          incrementNoBalls(extraRuns);
+          if(ballExtra.substring(3, 4) == 'B') {
+              incrementByes(ballRuns);
+          }
+        } else if(ballExtra.substring(0, 2) == 'WD') {
+          incrementWides(extraRuns + ballRuns);
+        }
+        
+      }
+    }
+    
+    function incrementByes(increment) {
+      console.log('Increment byes', increment)
+      const extras = document.getElementById('extrasScoreBoard' + inningsCount);
+      extras.dataset.byes = parseInt(extras.dataset.byes) + increment;
+    }
+    
+    function incrementLegByes(increment) {
+      const extras = document.getElementById('extrasScoreBoard' + inningsCount);
+      extras.dataset.legByes = parseInt(extras.dataset.legByes) + increment;
+    }
+    
+    function incrementWides(increment) {
+      const scoreBoard = document.getElementById('battersScoreBoard');
+      scoreBoard.dataset.battersScore = parseInt(scoreBoard.dataset.battersScore) + increment;
+      const extras = document.getElementById('extrasScoreBoard' + inningsCount);
+      extras.dataset.wides = parseInt(extras.dataset.wides) + increment;
+      
+      const bowlerScoreBoard = document.getElementById('bowlerScoreBoard' + bowlerIn);
+      bowlerScoreBoard.dataset.runs = parseInt(bowlerScoreBoard.dataset.runs) + increment;
+    }
+    
+    function incrementNoBalls(increment) {
+      const scoreBoard = document.getElementById('battersScoreBoard');
+      scoreBoard.dataset.battersScore = parseInt(scoreBoard.dataset.battersScore) + increment;
+      const extras = document.getElementById('extrasScoreBoard' + inningsCount);
+      extras.dataset.noBalls = parseInt(extras.dataset.noBalls) + increment;
+      
+      const bowlerScoreBoard = document.getElementById('bowlerScoreBoard' + bowlerIn);
+      bowlerScoreBoard.dataset.runs = parseInt(bowlerScoreBoard.dataset.runs) + increment;
+    }
+    
+    function incrementWickets(batter, increment, bowlerIn) {
+      const scoreBoard = document.getElementById('battersScoreBoard');
+      scoreBoard.dataset.wicketsFallen = parseInt(scoreBoard.dataset.wicketsFallen) + increment;
+      
+      const batterName = document.getElementById('batterName' + batter);
+      if(settings.mode != 'Pairs') {
+        if(increment == 1) {
+            batterName.className = batterName.className.replace('batting', 'dot');
+            batterName.parentElement.style.order = batter;
+            batterName.parentElement.dataset.out = true;
+        } else {
+          batterName.className = batterName.className.replace('dot', 'batting');
+          batterName.parentElement.style.order = batter + 100;
+          batterName.parentElement.dataset.out = false;
+          
+          const batterOutName = document.getElementById('batterName' + battersCount);
+          batterOutName.className = batterOutName.className.replace('batting', 'dot');
+          if(firstBatterOnStrike == battersCount) {
+            firstBatterOnStrike = batter;
+            document.getElementById(isFirstBatterOnstrike ? 'strikersName' : 'nonstrikersName').dataset.batterName = getBatter(batter);
+          } else {
+            secondBatterOnstrike = batter;
+            document.getElementById(!isFirstBatterOnstrike ? 'strikersName' : 'nonstrikersName').dataset.batterName = getBatter(batter);
+          }
+          
+          battersCount -= 1;
+        }
+      } else {
+        swapBatters();
+      }
+      const bowlerScoreBoard = document.getElementById('bowlerScoreBoard' + bowlerIn);
+      bowlerScoreBoard.dataset.wickets = parseInt(bowlerScoreBoard.dataset.wickets) + increment;
+    }
+    
+    function incrementBallsFaced(increment, isFirstBatter, ballExtra) {
+      console.log('Inc balls faced', increment, isFirstBatter, ballExtra);
+      const batterScoreBoard = document.getElementById('batterScoreBoard' + (isFirstBatter ? firstBatterOnStrike : secondBatterOnstrike));
+      if(ballExtra.substring(0, 2) != 'WD') batterScoreBoard.dataset.balls = parseInt(batterScoreBoard.dataset.balls) + increment; // balls faced doesn't include wides, as you can't hit them
+    }
+    
+    function incrementRuns(increment, isFirstBatter, ballExtra) {
+      console.log('Inc runs', increment, isFirstBatter, ballExtra);
+      const batterScoreBoard = document.getElementById('batterScoreBoard' + (isFirstBatter ? firstBatterOnStrike : secondBatterOnstrike));
+      if(increment != 0) {
+        const scoreBoard = document.getElementById('battersScoreBoard');
+        if(ballExtra.substring(0, 2) != 'WD') scoreBoard.dataset.battersScore = parseInt(scoreBoard.dataset.battersScore) + increment;
+        
+        
+        
+        
+        if(ballExtra.substring(0, 1) == 'B' || ballExtra.substring(0, 2) == 'LB') {
+          if(ballExtra.substring(0, 2) != 'LB') {
+            incrementByes(increment);
+          } else {
+            incrementLegByes(increment);
+          }
+        } else if(ballExtra.substring(3, 4) != 'B') {
+          batterScoreBoard.dataset.runs = parseInt(batterScoreBoard.dataset.runs) + increment;
+          const bowlerScoreBoard = document.getElementById('bowlerScoreBoard' + bowlerIn);
+          if(ballExtra.substring(0, 2) != 'WD') bowlerScoreBoard.dataset.runs = parseInt(bowlerScoreBoard.dataset.runs) + increment;
+        }
+      }
+      incrementBallsFaced(1, isFirstBatter, ballExtra);
+    }
+    
+    function netScore() {
+      const scoreBoard = document.getElementById('battersScoreBoard');
+      return parseInt(scoreBoard.dataset.battersScore) + (parseInt(scoreBoard.dataset.wicketsFallen) * -5) + 200;
+    }
+    
+    function storeBalls(initialise) {
+      if(!initialise) {
+        var balls = [];
+        for(b=1; b<ballCount; b++) { //not including ball ready
+          const ballDataset = document.getElementById('ball' + b).dataset;
+          balls.push(ballDataset);
+          //console.log(ballDataset);
+        }
+        localStorage.setItem('Balls', JSON.stringify(balls));
+      } else {
+        try {
+          var balls = JSON.parse(localStorage.getItem('Balls'));
+          var temp = balls.length;
+          console.log('records:', temp);
+        } catch {
+          console.log('No balls stored');
+          return
+        }
+        var balls = JSON.parse(localStorage.getItem('Balls'));
+        for(i=0; i<balls.length; i++) {
+          const decision = {
+            ballRuns: parseInt(balls[i].ballRuns),
+            extraRuns: parseInt(balls[i].extraRuns),
+            ballExtra: balls[i].ballExtra,
+            isViable: balls[i].isViable == 'true',
+            isValidBall: balls[i].isValidBall == 'true',
+            batterOut: parseInt(balls[i].batterOut)
+          }
+          const env = {
+            isOffstrike: balls[i].isOffstrike == 'true',
+            isFirstBatterOnstrike: balls[i].isFirstBatterOnstrike == 'true'
+          }
+          const game = getGame();
+          /*{
+            isFirstBatterOnstrike: balls[i].isFirstBatterOnstrike == 'true',
+            firstBatterOnStrike: parseInt(balls[i].firstBatterOnStrike),
+            secondBatterOnstrike: parseInt(balls[i].secondBatterOnstrike),
+            overBallCount: parseInt(balls[i].overBallCount),
+            overCount: overCount,
+            overValidBallCount: parseInt(balls[i].overValidBallCount),
+            bowlerIn: parseInt(balls[i].bowlerIn)
+          }*/
+          if(game.bowlerIn != balls[i].bowlerIn) { //align bowlerIn
+            incrementBowler(balls[i].bowlerIn - game.bowlerIn);
+            game.bowlerIn = balls[i].bowlerIn;
+          }
+          incrementRuns(decision.ballRuns, game.isFirstBatterOnstrike, decision.ballExtra);
+          incrementExtras(decision.ballExtra, decision.ballRuns, decision.extraRuns);
+          if(decision.batterOut != 0) { 
+            incrementWickets(decision.batterOut, 1, game.bowlerIn);
+            if(settings.mode != 'Pairs') {
+              newBatter(decision.batterOut == game.firstBatterOnStrike);
+            }
+          }
+          console.log('ball', balls[i], decision, env, game);
+          newBall(decision, env, game, balls[i].edited == 'true');
+          console.log('Re-initialised ball:',i+1);
+          nextBall(decision);
+          if(env.isOffstrike) swapBatters();
+          console.log(getGame());
+        }
+      }
+    }
+    
+    function newExtrasScoreBoard() {
+      inningsCount += 1;
+      const scoreBoard = document.getElementById('battersScoreBoard');
+      scoreBoard.innerHTML += '<div class="extrasScoreBoard" id="extrasScoreBoard' + inningsCount + '" data-wides="0" data-byes="0" data-leg-byes="0" data-no-balls="0"><div class="action wides">Extras</div></div>';
+    }
+    
+    function incrementBowler(increment) {
+      //if(increment == 1 || (increment == -1 && bowlerIn > 1)) {
+        if ((bowlerIn + increment) > 0) bowlerIn += increment;
+        if(bowlerIn > bowlersCount) bowlersCount = bowlerIn;
+        const scoreBoard = document.getElementById('fieldersScoreBoard');
+        try {
+          const bowlerScoreBoardHtml = document.getElementById('bowlerScoreBoard' + bowlerIn).innerHTML;
+        } catch {
+          scoreBoard.innerHTML += '<div class="bowlerScoreBoard" id="bowlerScoreBoard' + bowlerIn + '" data-runs="0" data-wickets="0" style="order: ' + (bowlerIn * 10) + '"><div class="action bowling bowlerName" id="bowlerName' + bowlerIn + '" data-bowler-name="Bowler #' + bowlerIn + '" onclick="clickBowler(' + bowlerIn + ');"></div></div>';
+        }
+        document.getElementById('extrasScoreBoard' + inningsCount).style.order = (bowlerIn * 10 + 1);
+        scoreBoard.scrollLeft = (bowlerIn * 120) - 120;
+        const bowlerName = document.getElementById('bowlerName');
+        bowlerName.dataset.bowlerName = getBowler(bowlerIn);
+        const overBowler = document.getElementById('over' + overCount + 'Bowler');
+        overBowler.dataset.bowlerIn = '#' + bowlerIn + ' ';
+        overBowler.dataset.bowlerInitials = getBowler(bowlerIn, true);
+        storeBowlers();
+      //}
+    }
+    
+    function storeBowlers(initialise) {
+      if(!initialise) {
+        var bowlers = [];
+        for(b=1; b<=bowlersCount; b++) {
+          bowlers.push(getBowler(b));
+        }
+        localStorage.setItem('Bowlers', JSON.stringify(bowlers));
+      } else {
+        try {
+          var bowlers = JSON.parse(localStorage.getItem('Bowlers'));
+          var temp = bowlers.length;
+          console.log('Bowler records:', temp);
+        } catch {
+          console.log('No bowlers stored');
+          incrementBowler(1);
+          return
+        }
+        var bowlers = JSON.parse(localStorage.getItem('Bowlers'));
+        for(i=0; i<bowlers.length; i++) {
+          console.log('Inc', i)
+          incrementBowler(1);
+          const bowlerName = document.getElementById('bowlerName' + (i+1));
+          bowlerName.dataset.bowlerName = bowlers[i];
+          console.log('Re-initialised bowler:',i+1);
+        }
+        incrementBowler(-(bowlers.length - 1));
+      }
+    }
+    
+    function refreshOverBowlers() {
+      for(b=1; b<ballCount+1; b++) {
+        const ball = document.getElementById('ball' + b);
+        if(ball.dataset.overBallCount == 1) {
+          const overBowler = document.getElementById('over' + ball.dataset.overCount + 'Bowler');
+          overBowler.dataset.bowlerIn = '#' + ball.dataset.bowlerIn + ' ';
+          overBowler.dataset.bowlerInitials = getBowler(ball.dataset.bowlerIn, true);
+        }
+      }
+    }
+    
+    function clickBowler(bowlerIndex) {
+      //alert('Bowler #' + bowlerIndex);
+      document.getElementById('modalOverlay').style.display = 'block';
+      const bowlerModal = document.getElementById('bowlerModal');
+      bowlerModal.dataset.modalTitle = 'Edit bowler #' + bowlerIndex;
+      bowlerModal.style.display = 'block';
+      document.getElementById('bowlerTextEntryContainer').innerHTML = '<input type="text" id="bowlerTextEntry">';
+      const bowlerTextEntry = document.getElementById('bowlerTextEntry');
+      const bowlerName = document.getElementById('bowlerName' + bowlerIndex);
+      bowlerTextEntry.value = bowlerName.dataset.bowlerName;
+      bowlerTextEntry.focus();
+      bowlerTextEntry.select();
+        bowlerTextEntry.addEventListener("change", (event) => {
+          
+          if(bowlerTextEntry.value != '') {
+            bowlerName.dataset.bowlerName = bowlerTextEntry.value;
+            if(bowlerIn == bowlerIndex) 
+              document.getElementById('bowlerName').dataset.bowlerName = bowlerTextEntry.value;
+            incrementBowler(0);
+            storeBowlers();
+            refreshOverBowlers();
+          }
+          });
+      //}
+    }
+    
+    function hideModals() {
+      document.getElementById('bowlerModal').style.display = 'none';
+      document.getElementById('batterModal').style.display = 'none';
+      document.getElementById('ballModal').style.display = 'none';
+      document.getElementById('colorModal').style.display = 'none';
+      document.getElementById('shareModal').style.display = 'none';
+      document.getElementById('entryModal').style.display = 'none';
+      document.getElementById('modalOverlay').style.display = 'none';
+    }
+    
+    function newBatter(isFirstBatter) {
+      battersCount += 1;
+      if(isFirstBatter) {
+        firstBatterOnStrike = battersCount;
+      } else {
+        secondBatterOnstrike = battersCount;
+      }
+      const scoreBoard = document.getElementById('battersScoreBoards');
+      try {
+        const batterScoreboardHtml = document.getElementById('batterScoreBoard' + battersCount).innerHTML;
+      } catch {
+        scoreBoard.innerHTML += newBatterScoreBoard(battersCount, 'Batter #' + battersCount);
+      }
+      const batterName = document.getElementById('batterName' + battersCount);
+      batterName.className = batterName.className.replace('dot', 'batting');
+      batterName.parentElement.style.order = battersCount + 100;
+      batterName.parentElement.dataset.out = false;
+      const batterStrikeName = document.getElementById((isFirstBatter && isFirstBatterOnstrike) || (!isFirstBatter && !isFirstBatterOnstrike) ? 'strikersName' : 'nonstrikersName');
+      batterStrikeName.dataset.batterName = getBatter(battersCount);
+      scoreBoard.scrollLeft = parseInt(document.getElementById('battersScoreBoard').dataset.wicketsFallen) * 230;
+      storeBatters();
+    }
+    
+    function newBatterScoreBoard(batterIndex, batterNameText) {
+      return '<div class="batterScoreBoard" id="batterScoreBoard' + batterIndex + '" data-runs="0" data-balls="0" data-out="true" style="order: ' + (batterIndex + 100) + '"><div class="action dot batterName" id="batterName' + batterIndex + '" data-batter-name="' + batterNameText + '" onclick="clickBatter(' + batterIndex + ');"></div></div>';
+    }
+    
+    function storeBatters(initialise) {
+      if(!initialise) {
+        var batters = [];
+        for(b=1; b<=battersCount; b++) {
+          batters.push(getBatter(b));
+        }
+        localStorage.setItem('Batters', JSON.stringify(batters));
+      } else {
+        try {
+          var batters = JSON.parse(localStorage.getItem('Batters'));
+          var temp = batters.length;
+          console.log('Batter records:', temp);
+        } catch {
+          console.log('No batters stored');
+          return
+        }
+        var batters = JSON.parse(localStorage.getItem('Batters'));
+        for(i=0; i<batters.length; i++) {
+          //console.log('Inc', i)
+          const scoreBoard = document.getElementById('battersScoreBoards');
+          scoreBoard.innerHTML += newBatterScoreBoard(i+1, batters[i]);
+          console.log('Re-initialised batter:',i+1);
+        }
+      }
+    }
+    
+    function clickBatter(batterIndex) {
+      //alert('Bowler #' + bowlerIndex);
+      document.getElementById('modalOverlay').style.display = 'block';
+      const batterModal = document.getElementById('batterModal');
+      batterModal.dataset.modalTitle = 'Edit batter #' + batterIndex;
+      batterModal.style.display = 'block';
+      document.getElementById('batterTextEntryContainer').innerHTML = '<input type="text" id="batterTextEntry">';
+      
+      const batterTextEntry = document.getElementById('batterTextEntry');
+      
+      const batterName = document.getElementById('batterName' + batterIndex);
+      batterTextEntry.value = batterName.dataset.batterName;
+      batterTextEntry.focus();
+      batterTextEntry.select();
+      batterTextEntry.addEventListener("change", (event) => {
+          if(batterTextEntry.value != '') {
+            batterName.dataset.batterName = batterTextEntry.value;
+            if(firstBatterOnStrike == batterIndex) {
+              document.getElementById(isFirstBatterOnstrike ? 'strikersName' : 'nonstrikersName').dataset.batterName = batterTextEntry.value;
+            } else {
+              document.getElementById(!isFirstBatterOnstrike ? 'strikersName' : 'nonstrikersName').dataset.batterName = batterTextEntry.value;
+            }
+            storeBatters();
+            showReady(true);
+          }
+        }, {once: true});
+    }
+    
+    function nextBall(decision) {
+      ballCount += 1;
+      overValidBallCount += decision.isValidBall ? 1 : 0;
+      const ballTracker = document.getElementById('ballTracker' + overCount);
+      if(overValidBallCount >= ballsPerOver() && settings.lastOver != overCount) {
+            ballTracker.dataset.ballsToCome = '';
+            overCount += 1;
+            overBallCount = 1;
+            overValidBallCount = 0;
+            if(settings.mode == 'Pairs' && (overCount-1)/oversPerPair() == Math.round((overCount-1)/oversPerPair())) {
+              const firstBatterName = document.getElementById('batterName' + firstBatterOnStrike);
+              firstBatterName.className = firstBatterName.className.replace('batting', 'dot');
+              firstBatterName.parentElement.style.order = firstBatterOnStrike;
+              firstBatterName.parentElement.dataset.out = true;
+              newBatter(true);
+              const secondBatterName = document.getElementById('batterName' + secondBatterOnstrike);
+              secondBatterName.className = secondBatterName.className.replace('batting', 'dot');
+              secondBatterName.parentElement.style.order = secondBatterOnstrike;
+              secondBatterName.parentElement.dataset.out = true;
+              newBatter(false);
+              console.log('Pair retired', (overCount-1)/4, Math.round((overCount-1)/4));
+            }
+            newOver();
+      } else {
+            //ballTracker.style.width = (Math.ceil((overBallCount + ballsPerOver() - overValidBallCount) / 2) * 52) + 'px';
+            overBallCount += 1;
+      }
+      ballTracker.dataset.ballsToCome = ballsPerOver() - overValidBallCount;
+      refreshProxies();
+      ballTracker.scrollIntoView();
+    }
+    
+    function refreshProxies() {
+      // remove proxies
+      for(p=0; p<ballsPerOver(); p++) {
+        try {
+          document.getElementById('proxy' + (p+1)).remove();;
+        } catch {}
+      }
+      const ballTracker = document.getElementById('ballTracker' + overCount);
+      // adjust balltracker width
+      ballTracker.style.width = (Math.ceil((overBallCount - 1 + ballsPerOver() - overValidBallCount) / 2) * 52) + 'px';
+      // add proxies
+      for(p=0; p<(ballsPerOver() - overValidBallCount); p++) {
+        if(p < (ballsPerOver() - overValidBallCount - 1)) {
+          ballTracker.innerHTML += '<div class="balls proxy" id="proxy' + (p+1) + '"></div>';
+        } else {
+          if(settings.lastOver == -1 && overBallCount == 1) {
+            ballTracker.innerHTML += '<div class="balls proxy" id="proxy' + (p+1) + '" onclick="setLastOver(' + overCount + ');"><span class="material-icons">lock_open</span></div>';
+          } else {
+            if (settings.lastOver == overCount && overBallCount == 1) {
+              ballTracker.innerHTML += '<div class="balls proxy last" id="proxy' + (p+1) + '" onclick="setLastOver(-1);"><span class="material-icons">lock</span></div>';
+            } else if(settings.lastOver == overCount) {
+              ballTracker.innerHTML += '<div class="balls proxy last" id="proxy' + (p+1) + '"><span class="material-icons">lock</span></div>';
+            } else {
+              ballTracker.innerHTML += '<div class="balls proxy" id="proxy' + (p+1) + '"></div>';
+            }
+          }
+        }
+      }
+    }
+    
+    function newOver() {
+      try {
+        document.getElementById('ballTracker' + overCount).innerHTML;
+      } catch {
+        console.log('New over ' + overCount);
+        const ballTrackers = document.getElementById('ballTrackers');
+        ballTrackers.innerHTML += '<div class="overs" id="over' + overCount + '">' + overCount + '<div id="over' + overCount + 'Bowler" class="overBowlers"></div></div><div class="ballTracker" id="ballTracker' + overCount + '"></div>';
+        const ballTracker = document.getElementById('ballTracker' + overCount);
+        refreshProxies();
+        ballTracker.scrollIntoView();
+      }
+      if(overCount > 1) {
+        if(battersSwap(overCount)) swapBatters();
+        incrementBowler(1);
+      }
+      logAction('newOver');
+      //showReady();
+    }
+    
+    function undoBall() {
+      if(ballCount > 1) {
+        ballCount -= 1;
+        const ballToRemove = document.getElementById('ball' + ballCount);
+        ballData = ballToRemove.dataset;
+        if(ballCount > 1) { //note decremented
+          const ballBefore = document.getElementById('ball' + (ballCount-1)).dataset;
+          if(overBallCount == 1) {
+            if(battersSwap(overCount)) swapBatters();
+            overCount -= 1;
+          } 
+          overValidBallCount = parseInt(ballData.overValidBallCount);
+          overBallCount = parseInt(ballData.overBallCount);
+          if(bowlerIn != ballData.bowlerIn) { //align bowlerIn
+            incrementBowler(ballData.bowlerIn - bowlerIn);
+          }
+        } else {
+          overValidBallCount = 0;
+          overBallCount = 1;
+        }
+        
+        //update scores
+        incrementRuns(-parseInt(ballData.ballRuns), ballData.isFirstBatterOnstrike == 'true', ballData.ballExtra + '');
+        incrementExtras(ballData.ballExtra + '', -parseInt(ballData.ballRuns), -parseInt(ballData.extraRuns));
+        incrementBallsFaced(-2, ballData.isFirstBatterOnstrike == 'true', ballData.ballExtra + ''); // yes, -2, as incrementruns adds 1 even when inc is -1 or more
+        //update batters
+        if(ballData.ballExtra.search('W') != -1 && ballData.ballExtra != 'WD') {
+          incrementWickets(parseInt(ballData.batterOut), -1, bowlerIn);
+        }
+        //update bowler
+        // Todo
+        
+        if(ballToRemove.dataset.isOffstrike == 'true') swapBatters();
+        
+        //finish
+        ballToRemove.remove();
+        storeBalls();
+        refreshProxies();
+        const overLabel = document.getElementById('over' + overCount);
+        overLabel.scrollIntoView();
+        showReady(true);
+        
+        hideHint('undoHint', 350, 400);
+      }
+    }
+    
+    function showReady(reset) {
+      const thisBall = document.getElementById('thisBall');
+      if(reset) {
+        thisBall.innerHTML = '<div class="action marker">Ready for ball ' + (overCount - 1) + '.' + overBallCount + '</div>';
+      } else {
+        thisBall.innerHTML += '<div class="action marker">Ready for ball ' + (overCount - 1) + '.' + overBallCount + '</div>';
+      }
+      if(settings.mode == 'Pairs') {
+        thisBall.innerHTML += '<div class="action batting">Pairs score ' + netScore() + '</div>';
+      }
+      if((!isOffstrike && isFirstBatterOnstrike) || (isOffstrike && !isFirstBatterOnstrike)){
+          thisBall.innerHTML += '<div class="action batting">' + getBatter(firstBatterOnStrike) + ' on strike</div>';
+      } else {
+          thisBall.innerHTML += '<div class="action batting">' + getBatter(secondBatterOnstrike) + ' on strike</div>';
+      }
+      thisBall.innerHTML += '<div class="action marker">' + (ballsPerOver() - overValidBallCount) + ' ball' + ( (ballsPerOver() - overValidBallCount) != 1? 's' : '') + ' to come</div>';
+    }
+    
+    function resetCloseInfield(hideNow) {
+      const strikersWicket = document.getElementById("strikersWicket");
+      const field = document.getElementById("field");
+      const wicketKeeper = document.getElementById("wicketKeeper");
+      const nonstrikersWicket = document.getElementById("nonstrikersWicket");
+      
+      isStrikingWicket = false;
+      isWithField = false;
+      isWicketKeeping = false;
+      isStrikingNonstrikersWicket = false;
+      //isOffstrike = false;
+      if(!hideNow) {
+        shade(strikersWicket);
+        strikersWicket.style.left = '150px';
+        shade(field);
+        shade(wicketKeeper);
+        nonstrikersWicket.style.left = isOffstrike ? '0px' : '150px';
+      } else {
+        strikersWicket.style.opacity = isOffstrike || isWithPlusTwo ? 0.2 : 0;
+        strikersWicket.style.left = isOffstrike ? '0px' : '150px';
+        hide(field); // //
+        hide(wicketKeeper); // //
+        nonstrikersWicket.style.left = isOffstrike ? '150px' : '0px';
+      }
+    }
+    
+    function resetInfield(hideNow, extras) {
+      //const plusThree = document.getElementById("plusThree");
+      const plusOne = document.getElementById("plusOne");
+      const plusTwo = document.getElementById("plusTwo");
+      const plusSix = document.getElementById("plusSix");
+      const plusFour = document.getElementById("plusFour");
+      
+      isWithPlusOne = false;
+      isWithPlusThree = false;
+      isWithPlusSix = false;
+      isWithPlusTwo = false;
+      isWithPlusFour = false;
+      if(!hideNow) {
+        //hide(plusThree); // //
+        shade(plusOne);
+        shade(plusTwo);
+        shade(plusSix);
+        shade(plusFour);
+      } else {
+        //hide(plusThree); // //
+        hide(plusOne); // //
+        hide(plusTwo); // //
+        hide(plusSix); // //
+        hide(plusFour); // //
+      }
+      if(extras) {
+        plusOne.style.backgroundColor = 'var(--extras-color)';
+        plusOne.style.color = '#ffffff';
+        plusOne.style.left = isWide? '63px' : '223px';
+        plusTwo.style.backgroundColor = 'var(--extras-color)';
+        plusTwo.style.color = '#ffffff';
+        plusTwo.style.left = isWide? '223px' : '63px';
+        plusSix.style.backgroundColor = 'var(--extras-color)';
+        plusSix.style.color = '#ffffff';
+        plusFour.style.backgroundColor = 'var(--extras-color)';
+        plusFour.style.color = '#ffffff';
+      } else {
+        //plusThree.style.backgroundColor = '#0055cc';
+        plusOne.style.backgroundColor = 'var(--batters-background-color)';
+        plusOne.style.color = 'var(--batters-color)';
+        plusOne.style.left = isLegBye? '223px' : '63px';
+        plusTwo.style.backgroundColor = 'var(--batters-background-color)';
+        plusTwo.style.color = 'var(--batters-color)';
+        plusTwo.style.left = !isLegBye? '223px' : '63px';
+        plusSix.style.backgroundColor = 'var(--batters-background-color)';
+        plusSix.style.color = 'var(--batters-color)';
+        plusFour.style.backgroundColor = 'var(--batters-background-color)';
+        plusFour.style.color = 'var(--batters-color)';
+      }
+    }
+    
+    function resetStrikersCrease(preview) {
+      const striker = document.getElementById("striker");
+      const wide = document.getElementById("wide");
+      const noBall = document.getElementById("noBall");
+      
+      isStriking = false;
+      isNoBall = false;
+      isWide = false;
+      isBye = false;
+      isLegBye = false;
+      if(!preview) {
+        shade(noBall);
+        shade(wide);
+        shade(bye);
+        shade(legBye);
+        shade(striker);
+      } else {
+        hide(noBall); // //
+        hide(wide); // //
+        hide(bye); // //
+        hide(legBye); // //
+        hide(striker); // //
+      }
+    }
+    
+    function resetBowling() {
+      isBowling = false;
+      isOffstrike = false;
+    }
+    
+    function checkActivating(element, canvasX, canvasY) {
+      
+      //console.log('Checking activating ' + element.id,element.offsetLeft ,element.offsetWidth ,  ballEntryOffsetRight, canvasX ,canvasY, element.offsetHeight , element.offsetTop , element.parentElement.offsetTop);
+      
+      if(element.offsetWidth + element.offsetLeft + 10 - ballEntryOffsetRight >= canvasX && 
+        canvasX >= element.offsetLeft - 10 - ballEntryOffsetRight &&
+        element.offsetHeight + element.offsetTop + element.parentElement.offsetTop >= canvasY && 
+        canvasY >= element.offsetTop + element.parentElement.offsetTop) {
+              //console.log('True');
+              return true;
+        
+             
+      } else {
+        //console.log('False');
+        return false;
+      }
+    }
+    
+    function handleStart(evt) {
+      evt.preventDefault();
+      console.log("touchstart.");
+      const el = document.getElementById("touchCanvas");
+      const ctx = el.getContext("2d");
+      const touches = evt.changedTouches;
+
+      //console.log(touches[0].pageX - el.offsetLeft, touches[0].pageY - el.offsetTop);
+        
+      if(!isBowling && !(settings.lastOver == overCount && overValidBallCount >= ballsPerOver())) {
+         
+          if(checkActivating(bowler,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+            isBowling = true;
+            document.getElementById('levelDescription').style.display = 'none';
+            document.getElementById('switch').style.display = 'none';
+            document.getElementById('home').style.display = 'none';
+            document.getElementById('color').style.display = 'none';
+            document.getElementById('shareBatters').style.display = 'none';
+            document.getElementById('shareBowlers').style.display = 'none';
+          }
+          
+      } else {
+          ctx.clearRect(0, 0, el.width, el.height);
+          resetBowling();
+          resetStrikersCrease();
+          resetInfield(true);
+          resetCloseInfield();
+      }
+    }
+    
+    function swapBatters(manual) {
+      if (ballCount > 1) {
+        isFirstBatterOnstrike = !isFirstBatterOnstrike;
+        const strikersName = document.getElementById('strikersName');
+        const nonstrikersName = document.getElementById('nonstrikersName');
+        const tempName = strikersName.dataset.batterName;
+        strikersName.dataset.batterName =
+          nonstrikersName.dataset.batterName;
+        nonstrikersName.dataset.batterName = tempName;
+  
+        const nonstriker = document.getElementById("nonstriker");
+        nonstriker.style.top = '-15px';
+        shade(nonstriker);
+        const striker = document.getElementById("striker");
+        striker.style.top = '-15px';
+        
+        if(manual) {
+            const ballToUpdate = document.getElementById('ball' + (ballCount - 1));
+            const lastBallOffstrike = ballToUpdate.dataset.isOffstrike == 'true' ? true : false;
+            ballToUpdate.dataset.isOffstrike = !lastBallOffstrike;
+            const lastBallEdited = ballToUpdate.dataset.edited == 'true' ? true : false;
+            ballToUpdate.dataset.edited = !lastBallEdited;
+            storeBalls();
+            showReady(true);
+        }
+        //showReady(true);
+      }
+    }
+    
+    function logAction(actionName, reset, batterRuns) {
+      const thisBall = document.getElementById('thisBall');
+      
+      if(reset) {
+        thisBall.innerHTML = '<div class="action marker">Ball ' + (overCount - 1) + '.' + overBallCount + '</div>';
+      }
+      if(actionName == 'bowler'){
+        thisBall.innerHTML += '<div class="action bowling">' + getBowler(bowlerIn) + ' runs in' + '</div>';
+      } else if(actionName == 'noBall'){
+        thisBall.innerHTML += '<div class="action extras">' + 'bowls a no-ball (' + noBallPenalty() + ' penalty runs)' + '</div>';
+      } else if(actionName == 'wide'){
+        thisBall.innerHTML += '<div class="action extras">' + 'bowls a wide (' + widePenalty() + ' penalty runs)' + '</div>';
+      } else if(actionName == 'bye'){
+        thisBall.innerHTML += '<div class="action batting">' + 'Batter misses ball' + '</div>';
+      } else if(actionName == 'legBye'){
+        thisBall.innerHTML += '<div class="action batting">' + 'Ball hits batter' + '</div>';
+      } else if(actionName == 'wicketKeeper'){
+          thisBall.innerHTML += '<div class="action bowling">' + getBatter(isFirstBatterOnstrike ? firstBatterOnStrike : secondBatterOnstrike) + ' caught out behind' + '</div>';
+      } else if(actionName == 'field'){
+          thisBall.innerHTML += '<div class="action bowling">' + getBatter(isFirstBatterOnstrike ? firstBatterOnStrike : secondBatterOnstrike) + ' caught out' + '</div>';
+      } else if(actionName == 'battersRun'){
+        if(batterRuns > 0) {
+          if(isWide) {
+            thisBall.innerHTML += '<div class="action batting">' + batterRuns + ' more wide' + (batterRuns > 1? 's' : '') + '</div>';
+          } else if(isNoBall && !isStriking) {
+            thisBall.innerHTML += '<div class="action batting">' + batterRuns + ' bye' + (batterRuns > 1? 's' : '') + '</div>';
+          } else if(isBye) {
+            thisBall.innerHTML += '<div class="action batting">' + batterRuns + ' bye' + (batterRuns > 1? 's' : '') + '</div>';
+          } else if(isLegBye) {
+            thisBall.innerHTML += '<div class="action batting">' + batterRuns + ' leg bye' + (batterRuns > 1? 's' : '') + '</div>';
+          } else if(isStriking) {
+            thisBall.innerHTML += '<div class="action batting">' + batterRuns + ' run' + (batterRuns > 1? 's' : '') + '</div>';
+          } else {
+            thisBall.innerHTML += '<div class="action batting">+' + batterRuns + '?</div>';
+          }
+        } else {
+          thisBall.innerHTML += '<div class="action dot">' + actionName + '</div>';
+        }
+      } else if(actionName == 'batterHits'){
+          if(isWide) {
+            thisBall.innerHTML += 'Hit a wide?<div class="action dot">Batters run</div><div class="action extras">+' + batterRuns + ' wide' + (batterRuns > 1? 's' : '') + '</div>';
+          } else if(isBye) {
+            thisBall.innerHTML += 'Hit a bye?<div class="action dot">Batters run</div><div class="action extras">' + batterRuns + ' bye' + (batterRuns > 1? 's' : '') + '</div>';
+          } else if(isLegBye) {
+            thisBall.innerHTML += 'Hit a leg bye?<div class="action dot">Batters run</div><div class="action extras">' + batterRuns + ' leg bye' + (batterRuns > 1? 's' : '') + '</div>';
+          } else {
+            thisBall.innerHTML += '<div class="action batting">' + batterRuns + ' run' + (batterRuns > 1? 's' : '') + '</div>';
+          }
+      } else if(actionName == 'offStrike'){
+          thisBall.innerHTML += '<div class="action dot">Batters run</div>';
+      } else if(actionName == 'striker'){
+          thisBall.innerHTML += '<div class="action batting">' + getBatter(isFirstBatterOnstrike ? firstBatterOnStrike : secondBatterOnstrike) + ' hits ball</div>';
+      } else if(actionName == 'nonstrikersWicket') {
+        var strikerName;
+        if((!isOffstrike && isFirstBatterOnstrike) || (isOffstrike && !isFirstBatterOnstrike)){
+          strikerName = getBatter(secondBatterOnstrike);
+        } else {
+          strikerName = getBatter(firstBatterOnStrike);
+        }
+        if(isOffstrike || isWithPlusTwo) {
+          thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' run out (' + (batterRuns - 1) + '  run' + ((batterRuns-1) != 1? 's' : '') + ' completed)</div>';
+        } else {
+          thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' out stumped</div>';
+        }
+      } else if(actionName == 'strikersWicket') {
+        var strikerName;
+        if((!isOffstrike && isFirstBatterOnstrike) || (isOffstrike && !isFirstBatterOnstrike)){
+          strikerName = getBatter(firstBatterOnStrike);
+        } else {
+          strikerName = getBatter(secondBatterOnstrike);
+        }
+        if(isOffstrike){
+          thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' run out (' + (batterRuns - 1) + '  run' + ((batterRuns-1) != 1? 's' : '') + ' completed)</div>';
+        } else if(isNoBall){
+          if(!isWithPlusTwo) {
+            thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' out stumped</div>';
+          } else {
+            thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' run out (' + (batterRuns - 1) + '  run' + ((batterRuns-1) != 1? 's' : '') + ' completed)</div>';
+          }
+        } else if(isBye){
+          if (isWithPlusTwo) {
+            thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' run out (' + (batterRuns - 1) + '  run' + ((batterRuns-1) != 1? 's' : '') + ' completed)</div>';
+          } else {
+          thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' bowled out</div>';
+          }
+        } else if(isLegBye){
+          if (!isWithPlusTwo) {
+            thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' out LBW</div>';
+          } else {
+            thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' run out (' + (batterRuns - 1) + '  run' + ((batterRuns-1) != 1? 's' : '') + ' completed)</div>';
+          }
+        } else {
+          if (!isWithPlusTwo) {
+            thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' out stumped</div>';
+          } else {
+            thisBall.innerHTML += '<div class="action bowling">' + strikerName + ' run out (' + (batterRuns - 1) + '  run' + ((batterRuns - 1) != 1 ? 's' : '') + ' completed)</div>';
+          }
+        }
+      } else if(actionName == 'newOver') {
+          thisBall.innerHTML += '<div class="action marker">New over</div>';
+      } else {
+          thisBall.innerHTML += '<div class="action dot">' + 'Dead ball' + '</div>';
+        }
+    }
+    
+    function makeDecision(env, game) {
+        var decision = {
+          ballRuns: 0,
+          extraRuns: 0,
+          ballExtra: '•',
+          isViable: false,
+          isValidBall: true,
+          batterOut: 0
+        }
+        
+        // count up runs and determine ball is valid
+        if((env.isStriking || env.isNoBall || env.isWide || env.isBye || env.isLegBye) && !( env.isWicketKeeping || env.isWithField)) { // i.e. there might be runs. ball delivered and not caught. todo
+          if(env.isWithPlusOne) {
+            decision.ballRuns += 1;
+            decision.ballExtra = '';
+          }
+          if(env.isWithPlusTwo) {
+            decision.ballRuns += 2
+            decision.ballExtra = '';
+          }
+          if(env.isWithPlusSix) {
+            decision.ballRuns += 6;
+            decision.ballExtra = '';
+          }
+          if(env.isWithPlusFour) {
+            decision.ballRuns += 4;
+            decision.ballExtra = '';
+          }
+          if(env.isWide) {
+            decision.extraRuns = widePenalty();
+            decision.ballExtra = 'WD';;
+            decision.isValidBall = wideIsValidBall();
+          } else if(env.isNoBall) {
+            decision.extraRuns = noBallPenalty();
+            decision.ballExtra =  env.isStriking ? 'NB' : 'NB+B';
+            decision.isValidBall = noBallIsValidBall();
+          } else if((env.isBye || env.isLegBye) && decision.ballRuns > 0) {
+            decision.ballExtra = env.isBye ? 'B' : 'LB';
+          } 
+          decision.isViable = true;
+        } else if(env.isStrikingNonstrikersWicket) { 
+          decision.isValidBall = false; // Mankad is not counted as a ball
+          decision.isViable = true;
+        }
+        if(env.isStrikingWicket || env.isWicketKeeping || env.isWithField || env.isStrikingNonstrikersWicket) {
+          if(env.isWide || env.isNoBall) {
+            decision.ballExtra += env.isStriking ? '++W' : '+W';
+          } else if((env.isBye || env.isLegBye) && decision.ballRuns > 1 ) {
+            decision.ballExtra += '+W';
+          } else {
+            decision.ballExtra = 'W';
+          }
+          decision.ballRuns = decision.ballRuns > 0 ? decision.ballRuns - 1 : decision.ballRuns;
+          // process batter out
+          if (env.isStrikingWicket || env.isWicketKeeping || env.isWithField) {
+              decision.batterOut = (!env.isOffstrike && game.isFirstBatterOnstrike) || (env.isOffstrike && !game.isFirstBatterOnstrike) ? game.firstBatterOnStrike : game.secondBatterOnstrike;
+            } else {
+              decision.batterOut = (env.isOffstrike && game.isFirstBatterOnstrike) || (!env.isOffstrike && !game.isFirstBatterOnstrike) ? game.firstBatterOnStrike : game.secondBatterOnstrike;
+            }
+          decision.isViable = true;
+        }
+      console.log(decision);
+      return decision
+    }
+    
+    function translateBallExtra(be) {
+      var translation = '';
+      if(be == 'W') {
+        translation = 'Wicket';
+      } else if(be == 'WD') {
+        translation = 'Wide(s)';
+      } else if(be == 'NB') {
+        translation = 'No-ball';
+      } else if(be == '•') {
+        translation = 'Valid ball';
+      } else if(be == '') {
+        translation = 'Valid ball';
+      } else if(be == 'NB++W') {
+        translation = 'No-ball + Run(s) + Wicket';
+      } else if(be == 'NB+B+W') {
+        translation = 'No-ball + Bye(s) + Wicket';
+      } else if(be == 'WD+W') {
+        translation = 'Wides()) + Wicket';
+      } else if(be == 'NB+B') {
+        translation = 'No-ball + Bye(s)';
+      } else if(be == 'B') {
+        translation = 'Bye(s)';
+      } else if(be == 'LB') {
+        translation = 'Leg Bye(s)';
+      } else if(be == 'B+W') {
+        translation = 'Bye(s) + Wicket';
+      } else if(be == 'LB+W') {
+        translation = 'Leg Bye(s) + Wicket';
+      } else {
+        translation = 'Unknown';
+      }
+      return translation;
+    }
+    
+    function newBall(decision, env, game, edited) {
+      const ballTracker = document.getElementById('ballTracker' + game.overCount);
+      ballTracker.innerHTML += newBallHTML();
+      
+        function newBallHTML() {
+          const onClick ='onclick="clickBall(this, ' + game.overCount + ')" ';
+          const runKeyCaps = ['\u25AA\uFE0F', '\u0031\uFE0F\u20E3', '\u0032\uFE0F\u20E3', '\u0033\uFE0F\u20E3', '\u0034\uFE0F\u20E3', '\u0035\uFE0F\u20E3', '\u0036\uFE0F\u20E3', '\u0037\uFE0F\u20E3', '\u0038\uFE0F\u20E3', '\u0039\uFE0F\u20E3'];
+          const superscript = ['\u2070', '\u00b9', '\u00b2', '\u00b3', '\u2074', '\u2075', '\u2076', '\u2077', '\u2078', '\u2079'];
+          
+          if(decision.ballExtra == 'W') {
+            if(decision.ballRuns == 0) {
+              return '<div ' + onClick + 'class="balls wicket" id="ball' + game.ballCount + '" title="' + '\ud83c\uddfc.' + '&nbsp;&nbsp;">W</div>';
+            } else {
+            return '<div ' + onClick + 'class="balls blbw" id="ball' + game.ballCount + '" title="' + '\ud83c\uddfc.\u207a' + superscript[parseInt(decision.ballRuns)] + '">' + decision.ballRuns + '<br>+W</div>';
+            }
+          } else if(decision.ballExtra == 'WD') {
+            return '<div ' + onClick + 'class="balls wide" id="ball' + game.ballCount + '" title="' + '\u2194\ufe0f' + ((decision.ballRuns > 0)? '\u207a' + superscript[parseInt(decision.ballRuns)]: '&nbsp;&nbsp;') + '">' + (decision.ballRuns + decision.extraRuns) + '<br>' + decision.ballExtra + '</div>'; // \u2795
+          } else if(decision.ballExtra == 'NB') {
+            if(decision.ballRuns == 0) {
+              return '<div ' + onClick + 'class="balls wide" id="ball' + game.ballCount + '" title="' + '\u2716\ufe0f.' + '&nbsp;&nbsp;">' + decision.ballExtra + '</div>'; // u2b55 () or \u2298\ufe0f no entry
+            } else {
+              return '<div ' + onClick + 'class="balls mixed" id="ball' + game.ballCount + '" title="' + '\u2716\ufe0f' + ((decision.ballRuns > 0)? '\u207a' + superscript[parseInt(decision.ballRuns)]: '&nbsp;&nbsp;') + '">' + decision.ballExtra + (decision.ballRuns > 0 ? '<br>+' + decision.ballRuns : '') + '</div>';
+            }
+          } else if(decision.ballExtra == 'NB+B') {
+            if(decision.ballRuns == 0) {
+              return '<div ' + onClick + 'class="balls wide" id="ball' + game.ballCount + '" title="' + '\u2716\ufe0f' + '&nbsp;&nbsp;">NB</div>';
+            } else {
+              return '<div ' + onClick + 'class="balls mixed" id="ball' + game.ballCount + '" title="' + '\u2716\ufe0f' + ((decision.ballRuns > 0)? '\u207a' + superscript[parseInt(decision.ballRuns)]: '&nbsp;&nbsp;') + '">NB' + (decision.ballRuns > 0 ? '<br>+' + decision.ballRuns + 'B': '') + '</div>';
+            }
+          } else if(decision.ballExtra == 'WD+W') {
+            return '<div ' + onClick + 'class="balls mixed wicket" id="ball' + game.ballCount + '" title="' + '\ud83c\uddfc.' + '\u207a' + superscript[parseInt(decision.ballRuns) + parseInt(decision.extraRuns)] + '">' + (decision.ballRuns + decision.extraRuns) + 'WD<br>W</div>';
+          } else if(decision.ballExtra == 'NB+B+W') {
+            if(decision.ballRuns > 0) {
+              return '<div ' + onClick + 'class="balls triple wicket" id="ball' + game.ballCount + '" title="' + '\ud83c\uddfc.' + '\u207a' + superscript[parseInt(decision.ballRuns) + parseInt(decision.extraRuns)] + '">NB' + (decision.ballRuns > 0 ? '<br>+' + decision.ballRuns : '') + 'B<br>W</div>';
+            } else {
+              return '<div ' + onClick + 'class="balls mixed wicket" id="ball' + game.ballCount + '" title="' + '\ud83c\uddfc.'+ '\u207a' + superscript[parseInt(decision.ballRuns) + parseInt(decision.extraRuns)] + '">NB' + '<br>W</div>';
+            }
+          } else if(decision.ballExtra == 'NB++W') {
+            if(decision.ballRuns > 0) {
+              return '<div ' + onClick + 'class="balls triple wicket" id="ball' + game.ballCount + '" title="' + '\ud83c\uddfc.'+ '\u207a' + superscript[parseInt(decision.ballRuns) + parseInt(decision.extraRuns)] + '">NB' + '<br>+' + decision.ballRuns + '<br>W</div>';
+            } else {
+              return '<div ' + onClick + 'class="balls mixed wicket" id="ball' + game.ballCount + '" title="' + '\ud83c\uddfc.'+ '\u207a' + superscript[parseInt(decision.ballRuns) + parseInt(decision.extraRuns)] + '">NB' + '<br>W</div>';
+            }
+          } else if(decision.ballExtra == 'B' || decision.ballExtra == 'LB'){
+          return '<div ' + onClick + 'class="balls byes" id="ball' + game.ballCount + '" title="' + '\u2195\ufe0f' + superscript[parseInt(decision.ballRuns) + parseInt(decision.extraRuns)] + '&nbsp;">' + decision.ballRuns + '<br>' + decision.ballExtra + '</div>'; // (decision.ballExtra == 'LB' ? '🔽' : '🔼')
+          } else if(decision.ballExtra == 'B+W' || decision.ballExtra == 'LB+W'){
+            return '<div ' + onClick + 'class="balls blbw" id="ball' + game.ballCount + '" title="\ud83c\uddfc.' + '\u207a' + superscript[parseInt(decision.ballRuns) + parseInt(decision.extraRuns)] + '">' + decision.ballRuns + (decision.ballExtra == 'LB+W' ? 'LB' : 'B') + '<br>+W</div>';
+          } else if(decision.ballRuns == 0) {
+            return '<div ' + onClick + 'class="balls dot" id="ball' + game.ballCount + '" title="' + runKeyCaps[decision.ballRuns] + '&nbsp;&nbsp;">•</div>';
+          } else {
+            return '<div ' + onClick + 'class="balls" id="ball' + game.ballCount + '" title="' + runKeyCaps[decision.ballRuns] + '&nbsp;&nbsp;">' + decision.ballRuns + '</div>';
+          }
+        }
+        
+        ballTracker.scrollIntoView();
+        const ballToUpdate = document.getElementById('ball' + game.ballCount);
+          
+          ballToUpdate.dataset.isOffstrike = env.isOffstrike;
+          ballToUpdate.dataset.ballRuns = decision.ballRuns;
+          ballToUpdate.dataset.extraRuns = decision.extraRuns;
+          ballToUpdate.dataset.ballExtra = decision.ballExtra;
+          ballToUpdate.dataset.isViable = decision.isViable;
+          ballToUpdate.dataset.isValidBall = decision.isValidBall;
+          ballToUpdate.dataset.batterOut = decision.batterOut;
+          ballToUpdate.dataset.overBallCount = game.overBallCount;
+          ballToUpdate.dataset.overValidBallCount = game.overValidBallCount;
+          ballToUpdate.dataset.isFirstBatterOnstrike = game.isFirstBatterOnstrike;
+          ballToUpdate.dataset.firstBatterOnStrike = game.firstBatterOnStrike;
+          ballToUpdate.dataset.secondBatterOnstrike = game.secondBatterOnstrike;
+          ballToUpdate.dataset.bowlerIn = game.bowlerIn;
+          ballToUpdate.dataset.overCount = game.overCount;
+          ballToUpdate.dataset.edited = edited;
+    }
+    
+    function clickBall(ballToExplain, overIndex) {
+      document.getElementById('modalOverlay').style.display = 'block';
+      const ballModal = document.getElementById('ballModal');
+      ballModal.dataset.modalTitle = 'Ball ' + (overIndex-1) + '.' + ballToExplain.dataset.overBallCount;
+      const ballDetails = document.getElementById('ballDetails');
+      ballDetails.innerHTML = '<div class="ballItems">Decision: <span id="ballDecision">' + 
+      translateBallExtra(ballToExplain.dataset.ballExtra) + '</span></div>';
+      ballDetails.innerHTML += '<div class="ballItems">Bowler: #' + ballToExplain.dataset.bowlerIn + ' <span class="action bowling">' + getBowler(ballToExplain.dataset.bowlerIn) + '</span></div>';
+      ballDetails.innerHTML += '<div class="ballItems">Extras: <span class="action wides">' + ballToExplain.dataset.extraRuns + '</span></div>';
+      ballDetails.innerHTML += '<div class="ballItems">On-strike: #' + (ballToExplain.dataset.isFirstBatterOnstrike == 'true'? ballToExplain.dataset.firstBatterOnStrike : ballToExplain.dataset.secondBatterOnstrike) + ' <span class="action batting">' + getBatter(ballToExplain.dataset.isFirstBatterOnstrike == 'true'? ballToExplain.dataset.firstBatterOnStrike : ballToExplain.dataset.secondBatterOnstrike) + '</span></div>';
+      ballDetails.innerHTML += '<div class="ballItems">Runs: <span class="action batting">' + ballToExplain.dataset.ballRuns + '</span></div>';
+      ballDetails.innerHTML += '<div class="ballItems">Off-strike: #' + (ballToExplain.dataset.isFirstBatterOnstrike == 'false'? ballToExplain.dataset.firstBatterOnStrike : ballToExplain.dataset.secondBatterOnstrike) + ' <span class="action batting">' + getBatter(ballToExplain.dataset.isFirstBatterOnstrike == 'false'? ballToExplain.dataset.firstBatterOnStrike : ballToExplain.dataset.secondBatterOnstrike) + '</span></div>';
+      if(ballToExplain.dataset.batterOut != '0') ballDetails.innerHTML += '<div class="ballItems">Batter out: #' + ballToExplain.dataset.batterOut + ' <span class="action reversed">' + getBatter(ballToExplain.dataset.batterOut) + '</span></div>';
+      if(ballToExplain.dataset.edited == 'true') ballDetails.innerHTML += '<div class="ballItems">Next ball: <span class="action reversed">Strike amended</span></div>';
+      //ballDetails.innerHTML += JSON.stringify(ballToExplain.dataset).replaceAll(',','<br>').replaceAll('"',' ');
+      document.getElementById('ballModalBall').innerHTML = ballToExplain.outerHTML;
+      ballModal.style.display = 'block';
+    }
+    
+    function clickShareBowlers() {
+      document.getElementById('modalOverlay').style.display = 'block';
+      const shareModal = document.getElementById('shareModal');
+      shareModal.dataset.modalTitle = 'Bowlers Scorecard';
+      const shareDetails = document.getElementById('shareDetails');
+      shareDetails.innerHTML = 'Bowling Stats:<br/>';
+      for(b=1; b<bowlersCount; b++) {
+        const bowlerScoreboard = document.getElementById('bowlerScoreBoard' + b); 
+        shareDetails.innerHTML += '<br/>#' + b + ' ' + getBowler(b) + '&nbsp;' +  bowlerScoreboard.dataset.wickets + '/' +  bowlerScoreboard.dataset.runs;
+      }
+      shareDetails.innerHTML += '<br/>';
+      var shareOverCount = 0;
+      var lastBowler = 0;
+      for(b=1; b<ballCount; b++) { //not including ball ready
+          const ball = document.getElementById('ball' + b);
+          //console.log(ballDataset);
+          if(ball.dataset.overBallCount == 1 || lastBowler != ball.dataset.bowlerIn) {
+            if(b > 1) {
+              const lastBall = document.getElementById('ball' + (b-1));
+              shareDetails.innerHTML += ' #' +  lastBall.dataset.bowlerIn + ' ' + getBowler(lastBall.dataset.bowlerIn, true);
+            }
+            if(ball.dataset.overBallCount == 1) shareOverCount += 1;
+            shareDetails.innerHTML += '<br/>' + String(shareOverCount).padStart(2, '0')  + ' ';
+          }
+          shareDetails.innerHTML += '' + ball.title.replace('.','') + '&nbsp;'; // + ((ball.dataset.ballExtra != '' && ball.dataset.ballExtra != 'W' && ball.dataset.ballExtra != '•')? (parseInt(ball.dataset.extraRuns) + parseInt(ball.dataset.ballRuns)) + '&nbsp;': '&numsp;&nbsp;');
+          lastBowler = ball.dataset.bowlerIn;
+      }
+      const lastBall = document.getElementById('ball' + (ballCount-1));
+      shareDetails.innerHTML += ' #' + lastBall.dataset.bowlerIn + ' ' + getBowler(lastBall.dataset.bowlerIn, true);
+      
+      shareDetails.innerHTML += '<br/><br/>Scoring by ScratchMatch.';
+      
+      shareModal.style.display = 'block';
+      
+      navigator.clipboard.writeText(shareDetails.innerText);
+    }
+    
+    function clickShareBatters() {
+      const superscript = ['\u2070', '\u00b9', '\u00b2', '\u00b3', '\u2074', '\u2075', '\u2076', '\u2077', '\u2078', '\u2079'];
+      document.getElementById('modalOverlay').style.display = 'block';
+      const shareModal = document.getElementById('shareModal');
+      shareModal.dataset.modalTitle = 'Batters Scorecard';
+      const shareDetails = document.getElementById('shareDetails');
+      shareDetails.innerHTML = 'Batting Stats:<br/>';
+      for(b=1; b<battersCount; b++) {
+        const batterScoreboard = document.getElementById('batterScoreBoard' + b); 
+        shareDetails.innerHTML += '<br/>#' + b + ' ' + getBatter(b) + '&nbsp;' +  batterScoreboard.dataset.runs + ' (' +  batterScoreboard.dataset.balls + ')';
+      }
+      shareDetails.innerHTML += '<br/>';
+      var shareOverCount = 0;
+      var onstrikeOver = '';
+      var lastBatterOnstrike = 1;
+      var lastBatterOffstrike = 2;
+      var offstrikeOver = '';
+     
+      for(b=1; b<ballCount; b++) { //not including ball ready
+          const ball = document.getElementById('ball' + b);
+          //console.log(ballDataset);
+          if(ball.dataset.overBallCount == 1) {
+            shareDetails.innerHTML += onstrikeOver + ' #' + lastBatterOnstrike + ' ' + getBatter(lastBatterOnstrike, true) + offstrikeOver + ' #' + lastBatterOffstrike + ' ' + getBatter(lastBatterOffstrike, true);
+            if(ball.dataset.overBallCount == 1) shareOverCount += 1;
+            offstrikeOver = '<br/>';// + String(shareOverCount).padStart(2, '0')  + ' ';
+            onstrikeOver = '<br/><br/>Over ' + shareOverCount + ' (#' +  ball.dataset.bowlerIn + ' ' + getBowler(ball.dataset.bowlerIn) + ')' + offstrikeOver;
+          }
+          if(ball.dataset.isFirstBatterOnstrike == 'true') {
+            onstrikeOver += '' + ball.title.replace('.','') ; //+ ((ball.dataset.ballExtra != '' && ball.dataset.ballExtra != 'W' && ball.dataset.ballExtra != '•' && ball.dataset.ballRuns != '0')? '\u207a' + superscript[parseInt(ball.dataset.ballRuns)] + '': '&numsp;');
+            offstrikeOver += '&numsp;-&numsp;&numsp;';
+          } else {
+            offstrikeOver += '' + ball.title.replace('.','') ; //+ ((ball.dataset.ballExtra != '' && ball.dataset.ballExtra != 'W' && ball.dataset.ballExtra != '•')? superscript[(parseInt(ball.dataset.extraRuns) + parseInt(ball.dataset.ballRuns))] + '': '&numsp;');
+            onstrikeOver += '&numsp;-&numsp;&numsp;';
+          }
+          lastBatterOnstrike = ball.dataset.firstBatterOnStrike;
+          lastBatterOffstrike = ball.dataset.secondBatterOnstrike;
+          
+      }
+      //shareDetails.innerHTML += onstrikeOver + offstrikeOver;
+      shareDetails.innerHTML += onstrikeOver + ' #' + lastBatterOnstrike + ' ' + getBatter(lastBatterOnstrike, true) + offstrikeOver + ' #' + lastBatterOffstrike + ' ' + getBatter(lastBatterOffstrike, true);
+      
+      shareDetails.innerHTML += '<br/><br/>Scoring by ScratchMatch.';
+      
+      shareModal.style.display = 'block';
+      
+      navigator.clipboard.writeText(shareDetails.innerText);
+    }
+    
+    function displayDecision(ctx, touchCanvas, decision) {
+          ctx.clearRect(0, 0, touchCanvas.width, touchCanvas.height);
+          touchCanvas.style.backgroundColor = '#ffffffdd';
+          ctx.fillStyle = "#000000";
+          ctx.lineWidth = 8;
+          ctx.font = "250px Arial";
+          if(decision.ballExtra == 'W') {
+            if(decision.ballRuns == 0) {
+              ctx.fillText(decision.ballExtra, 60, 220);
+            } else {
+              ctx.font = "150px Arial";
+              ctx.fillText(decision.ballRuns + '+' + decision.ballExtra, 40, 220);
+            }
+          } else if(decision.ballExtra == 'WD') {
+            ctx.font = "150px Arial";
+            ctx.fillText((decision.ballRuns + decision.extraRuns) + decision.ballExtra, 30, 220);
+          } else if(decision.ballExtra == 'NB') {
+            ctx.font = "150px Arial";
+            ctx.fillText(decision.ballExtra + (decision.ballRuns > 0 ? '+' + decision.ballRuns : '') , 0, 220);
+          } else if(decision.ballExtra == 'NB+B') {
+            ctx.font = "110px Arial";
+            ctx.fillText('NB' + (decision.ballRuns > 0 ? '+' + decision.ballRuns + 'B': '') , 10, 220);
+          } else if(decision.ballExtra == 'WD+W') {
+            ctx.font = "90px Arial";
+            ctx.fillText((decision.ballRuns + decision.extraRuns) + decision.ballExtra, 20, 220);
+          } else if(decision.ballExtra == 'NB+B+W') {
+            ctx.font = "90px Arial";
+            ctx.fillText('NB' + (decision.ballRuns > 0 ? '+' + decision.ballRuns + 'B': '') + '+W', 10, 220);
+          } else if(decision.ballExtra == 'NB++W') {
+            ctx.font = "90px Arial";
+            ctx.fillText('NB' + (decision.ballRuns > 0 ? '+' + decision.ballRuns : '') + '+W', 10, 220);
+          } else if(decision.ballExtra == 'B' || decision.ballExtra == 'LB'){
+            ctx.font = "150px Arial";
+            ctx.fillText(decision.ballRuns + decision.ballExtra, 50, 220);
+          } else if(decision.ballExtra == 'B+W' || decision.ballExtra == 'LB+W'){
+            ctx.font = "90px Arial";
+            ctx.fillText(decision.ballRuns + decision.ballExtra, 20, 220);
+          } else if(decision.ballRuns == 0) {
+            ctx.fillText(decision.ballRuns, 110, 220);
+          } else {
+            ctx.fillText(decision.ballRuns, 100, 220);
+          }
+    }
+    
+    function handleEnd(evt) {
+      evt.preventDefault();
+      console.log("touchend.");
+      if(isBowling) {
+        const el = document.getElementById("touchCanvas");
+        const ctx = el.getContext("2d");
+        const touches = evt.changedTouches;
+        const env = getEnviron();
+        const game = getGame();
+        const decision = makeDecision(env, game);
+        
+        if (decision.isViable) {
+          displayDecision(ctx, el, decision);
+          
+          // process hints
+          if(decision.ballExtra == 'W') {
+            if(env.isWicketKeeping) hideHint('wicketKeeperHint', touches[0].pageX - el.offsetLeft, touches[0].pageY - el.offsetTop);
+          } else if(decision.ballExtra == 'WD') {
+            if(decision.ballRuns == 0) hideHint('wideHint', touches[0].pageX - el.offsetLeft, touches[0].pageY - el.offsetTop);
+          } else if(decision.ballExtra == 'NB') {
+            
+          } else if(decision.ballExtra == 'NB+B') {
+            if (decision.ballRuns == 0) hideHint('noBallHint', touches[0].pageX - el.offsetLeft, touches[0].pageY - el.offsetTop);
+          } else if(decision.ballExtra == 'WD+W') {
+            
+          } else if(decision.ballExtra == 'NB+B+W') {
+            
+          } else if(decision.ballExtra == 'NB++W') {
+            
+          } else if(decision.ballExtra == 'B' || decision.ballExtra == 'LB'){
+            
+          } else if(decision.ballExtra == 'B+W' || decision.ballExtra == 'LB+W'){
+            
+          } else if(decision.ballRuns == 0) {
+            
+            hideHint('bowlerHint', touches[0].pageX - el.offsetLeft, touches[0].pageY - el.offsetTop);
+          } else {
+            if(decision.ballRuns == 1) {
+              hideHint('plusOneHint', touches[0].pageX - el.offsetLeft, touches[0].pageY - el.offsetTop);
+            } else if(env.isWithPlusFour) {
+              hideHint('plusFourHint', touches[0].pageX - el.offsetLeft, touches[0].pageY - el.offsetTop);
+            }
+          }
+          
+          //update game
+          incrementRuns(decision.ballRuns, game.isFirstBatterOnstrike, decision.ballExtra);
+          incrementExtras(decision.ballExtra, decision.ballRuns, decision.extraRuns);
+          if(decision.batterOut != 0) { 
+            incrementWickets(decision.batterOut, 1, game.bowlerIn);
+            if(settings.mode != 'Pairs') {
+              newBatter(decision.batterOut == game.firstBatterOnStrike);
+            } else {
+              env.isOffstrike = true;
+            }
+          }
+          
+          //add ball to balltracker
+          newBall(decision, env, game);
+          
+          
+          //process over ball
+          nextBall(decision);
+          
+          storeBalls();
+          //ctx.font = "60px Arial";
+          //ctx.fillText('NEW OVER', 20, 300);
+        } else {
+          document.getElementById('thisBall').innerHTML = '';
+          const bowlerNext = document.getElementById("bowlerNext");
+          const bowlerPrevious = document.getElementById("bowlerPrevious");
+          if(checkActivating(bowlerNext, touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+            incrementBowler(1);
+          } else if(checkActivating(bowlerPrevious, touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+            incrementBowler(-1);
+          }
+        }
+        logAction('deadBall');
+          setTimeout(function() {
+            const nonstrikersWicket = document.getElementById("nonstrikersWicket");
+            const nonstriker = document.getElementById("nonstriker");
+            
+            ctx.clearRect(0, 0, el.width, el.height);
+            
+            if(isOffstrike) {
+              swapBatters();
+            }
+            
+            shade(nonstrikersWicket);
+            shade(nonstriker);
+            nonstriker.style.top = '-15px';
+            resetBowling();
+            resetStrikersCrease();
+            resetCloseInfield();
+            resetInfield(true);
+            document.getElementById('touchCanvas').style.backgroundColor = '#00000000';
+            document.getElementById('switch').style.display = 'block';
+            document.getElementById('home').style.display = 'block';
+            document.getElementById('color').style.display = 'block';
+            document.getElementById('shareBatters').style.display = 'block';
+            document.getElementById('shareBowlers').style.display = 'block';
+            showReady();
+          }, 800);
+      }
+    }
+    
+    function handleMove(evt) {
+      evt.preventDefault();
+      console.log("touchmove.");
+      const el = document.getElementById("touchCanvas");
+      const ctx = el.getContext("2d");
+      const touches = evt.changedTouches;
+      
+      const bowler = document.getElementById("bowler");
+      const nonstrikersWicket = document.getElementById("nonstrikersWicket");
+      const striker = document.getElementById("striker");
+      const wide = document.getElementById("wide");
+      const noBall = document.getElementById("noBall");
+      const bye = document.getElementById("bye");
+      const legBye = document.getElementById("legBye");
+      const strikersWicket = document.getElementById("strikersWicket");
+      const field = document.getElementById("field");
+      const wicketKeeper = document.getElementById("wicketKeeper");
+      const plusThree = document.getElementById("plusThree");
+      const plusOne = document.getElementById("plusOne");
+      const plusTwo = document.getElementById("plusTwo");
+      const plusSix = document.getElementById("plusSix");
+      const plusFour = document.getElementById("plusFour");
+      const nonstriker = document.getElementById("nonstriker");
+      var ballRuns = 0;
+      
+      if(isBowling) {
+        //console.log("touchmove.bowling");
+        //const bowlerNext = document.getElementById("bowlerNext");
+        //console.log(checkActivating(bowlerNext, touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop));
+           if(checkActivating(bowler, touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+              //resetBowling();
+              isOffstrike = false;
+              shade(nonstrikersWicket);
+              resetStrikersCrease();
+              resetCloseInfield();
+              resetInfield(true);
+          } else if(checkActivating(striker,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+              if(!isWide && !isOffstrike && !isBye && !isLegBye && !isWithPlusOne && !isWithPlusTwo) {
+                if(!isStriking) {
+                  resetInfield();
+                  isStrikingNonstrikersWicket = false;
+                  shade(nonstrikersWicket);
+                  isStrikingWicket = false;
+                  shade(strikersWicket);
+                }
+                isStriking = true;
+                show(striker); // / /
+                hide(wide, bye, legBye); // //
+                if(!isNoBall) {
+                  hide(noBall); // //
+                }
+              }
+          } else if(checkActivating(wide,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+          
+              if(!isStriking && !isNoBall && !isBye && !isLegBye && !isWide) {
+                isWide = true;
+                resetCloseInfield();
+                resetInfield(false, true);
+                
+                show(wide);
+                shade(striker);
+                hide(plusSix, wicketKeeper, noBall, bye, legBye, field);
+              }
+          } else if(checkActivating(noBall,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+              if(!isWide && !isStriking && !isBye && !isLegBye && !isNoBall) {
+                isNoBall = true;
+                show(noBall); // / /
+                resetCloseInfield();
+                resetInfield(false, true);
+                shade(nonstrikersWicket);
+                hide(plusSix, wicketKeeper, field, wide);//, bye, legBye);
+              }
+          } else if(checkActivating(bye,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+          
+              if(!isStriking && !isWide && !isLegBye && !isBye) {
+                isBye = true;
+                resetCloseInfield();
+                resetInfield(false, false);
+                show(bye);
+                shade(striker, nonstrikersWicket);
+                isStrikingNonstrikersWicket = false;
+                hide(plusSix, wicketKeeper, wide, legBye, field);
+              }
+          } else if(checkActivating(legBye,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+          
+              if(!isStriking && !isWide && !isBye && !isLegBye) {
+                isLegBye = true;
+                resetCloseInfield();
+                resetInfield(false, false);
+                show(legBye);
+                isStrikingNonstrikersWicket = false;
+                shade(nonstrikersWicket, striker);
+                hide(plusSix, wicketKeeper, wide, bye, field);
+              }
+          } else if(checkActivating(strikersWicket,touches[0].pageX - el.offsetLeft,touches[0].pageY)) { // exception
+              
+              if((isStriking || isWide || isNoBall || isBye || isLegBye) && !isStrikingWicket && !isStrikingNonstrikersWicket) {
+                if(!isWide && !isNoBall && !isBye && !isLegBye && !isWithPlusOne && !isWithPlusTwo) {
+                  resetCloseInfield();
+                }
+                show(strikersWicket);
+                isStrikingWicket = true;
+                hide(nonstrikersWicket);
+                isStrikingNonstrikersWicket = false;
+              }
+              
+          } else if(checkActivating(nonstrikersWicket,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+              
+             if(!isStrikingNonstrikersWicket && !isStrikingWicket) {
+                if(!isWithPlusOne && !isWithPlusTwo) { resetInfield(true);
+                }
+                show(nonstrikersWicket);
+                isStrikingNonstrikersWicket = true;
+                hide(strikersWicket);
+                isStrikingWicket = false;
+             }
+              
+          } else if(checkActivating(field,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) {
+          
+              if(isStriking && !isNoBall && !isWide && !isBye && !isLegBye && !isWithPlusOne && !isWithPlusTwo && !isWithPlusFour && !isWithPlusSix && !isWithField) {
+                resetCloseInfield();
+                resetInfield(true);
+                show(field);
+                isWithField = true;
+              }
+              
+          } else if(checkActivating(wicketKeeper,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) { 
+          
+              if(isStriking && !isNoBall && !isWide && !isBye && !isLegBye && !isWithPlusOne && !isWithPlusTwo && !isWithPlusFour && !isWithPlusSix && !isWicketKeeping) {
+                resetCloseInfield();
+                resetInfield(true);
+                isWicketKeeping = true;
+                show(wicketKeeper);
+              }
+          } else if(checkActivating(plusOne,touches[0].pageX - el.offsetLeft,touches[0].pageY - el.offsetTop)) { 
+              if(!isStrikingWicket && !isWithField && !isWicketKeeping && (isStriking || isWide || isNoBall || isBye || isLegBye) && !isWithPlusOne) {
+                  isWithPlusOne = true;
+                show(plusOne);
+                isOffstrike = true;
+                resetCloseInfield(true);
+              }
+          } else if(checkActivating(plusTwo,touches[0].pageX - el.offsetLeft,touches[0].pageY)) { 
+              if(!isStrikingWicket && !isWithField && !isWicketKeeping && (isStriking || isWide || isNoBall || isBye || isLegBye) && !isWithPlusTwo) {
+                isWithPlusFour = false;
+                isWithPlusSix = false;
+                shade(plusSix, plusFour);
+                isWithPlusTwo = true;
+                show(plusTwo);
+                resetCloseInfield(true);
+              }
+          } else if(checkActivating(plusFour,touches[0].pageX - el.offsetLeft,touches[0].pageY)) { 
+              if(!isStrikingWicket && !isWithField && !isWicketKeeping && (isStriking || isWide || isNoBall || isBye || isLegBye) && !isWithPlusFour) {
+                isWithPlusFour = true;
+                show(plusFour);
+                isWithPlusSix = false;
+                shade(plusSix, plusTwo);
+                isWithPlusTwo = false;
+                resetCloseInfield(true);
+              }
+          } else if(checkActivating(plusSix,touches[0].pageX - el.offsetLeft,touches[0].pageY)) { 
+              if(isStriking && !isStrikingWicket && !isWithField && !isWicketKeeping && !isWithPlusSix) {
+                isWithPlusSix = true;
+                show(plusSix);
+                isWithPlusFour = false;
+                shade(plusFour, plusTwo);
+                isWithPlusTwo = false;
+                resetCloseInfield(true);
+              }
+          }
+          
+        // Now clear and draw
+        ctx.clearRect(0, 0, el.width, el.height);
+        ctx.beginPath();
+        ctx.strokeStyle = "#00000033";
+        ctx.lineWidth = 15;
+        //Bowler
+        ctx.moveTo(bowler.offsetLeft + (bowler.offsetWidth/2) - ballEntryOffsetRight, bowler.parentElement.offsetTop + 15);
+        logAction('bowler', true);
+        
+        // move nonstriker as touch moves
+        nonstriker.style.top =  Math.max(-95, Math.min(1.5 * (touches[0].pageY - el.offsetTop - 135 - 195), -15)) + 'px';
+        striker.style.top = '-15px';
+        //Striker
+        if(isNoBall) {
+          ctx.lineTo(noBall.offsetLeft + (noBall.offsetWidth/2) - ballEntryOffsetRight, 240 + 30);
+          logAction('noBall'); 
+        }
+        if(isStriking) {
+          ctx.lineTo(striker.offsetLeft + (striker.offsetWidth/2) - ballEntryOffsetRight, 120-15 + 30);
+          logAction('striker');
+        }
+        if(isWide) {
+          ctx.lineTo(wide.offsetLeft + (wide.offsetWidth/2) - ballEntryOffsetRight, wide.parentElement.offsetTop - 15 + 30);
+          logAction('wide');
+        }
+        if(isBye) {
+          ctx.lineTo(bye.offsetLeft + (bye.offsetWidth/2) - ballEntryOffsetRight, bye.parentElement.offsetTop - 15 + 30);
+          logAction('bye');
+        }
+        if(isLegBye) {
+          ctx.lineTo(legBye.offsetLeft + (legBye.offsetWidth/2) - ballEntryOffsetRight, legBye.parentElement.offsetTop - 15 + 30);
+          logAction('legBye');
+        } 
+        if(isStriking || isWide || isNoBall || isBye || isLegBye) {
+         
+              if(isOffstrike) {
+                nonstriker.style.top = '-193px';
+                show(nonstriker); // / /
+                striker.style.top = '65px';
+                strikersWicket.style.left = '0px';
+                nonstrikersWicket.style.left = '150px';
+                plusTwo.style.top = '200px';
+                
+              } else {
+                nonstriker.style.top = '-95px';
+                shade(nonstriker);
+                striker.style.top = '-15px';
+                nonstrikersWicket.style.left = '0px';
+                plusTwo.style.top = '55px';
+              }
+        }
+        
+          if(isWithField) {
+            ctx.lineTo(field.offsetLeft + (field.offsetWidth/2) - ballEntryOffsetRight, 30);
+            logAction('field');
+          } else if(isWicketKeeping) {
+            ctx.lineTo(wicketKeeper.offsetLeft + (wicketKeeper.offsetWidth/2) - ballEntryOffsetRight, 30);
+            logAction('wicketKeeper');
+          }
+          
+            if(isWithPlusOne) {
+            ctx.lineTo(plusOne.offsetLeft + (plusOne.offsetWidth/2) - ballEntryOffsetRight, plusOne.parentElement.offsetTop + 30);
+            ballRuns += 1;
+            logAction('offStrike');
+            }
+            
+            if(isWithPlusTwo) {
+            ctx.lineTo(plusTwo.offsetLeft + (plusTwo.offsetWidth/2) - ballEntryOffsetRight, (isOffstrike ? 200 : 55)+ 30);
+              ballRuns += 2;
+              if (!isWithPlusOne) logAction('offStrike');
+            }
+            
+            if(isWithPlusSix) {
+            ctx.lineTo(plusSix.offsetLeft + (plusSix.offsetWidth/2) - ballEntryOffsetRight, 0 + 30);
+              ballRuns += 6;
+            }   
+            
+            if(isWithPlusFour) {
+            ctx.lineTo(plusFour.offsetLeft + (plusFour.offsetWidth/2) - ballEntryOffsetRight, 0 + 30);
+              ballRuns += 4;
+            }
+
+          if (ballRuns == 0) {
+            plusOne.firstElementChild.innerHTML = '1';
+            plusTwo.firstElementChild.innerHTML = '2';
+            plusFour.firstElementChild.innerHTML = '4';
+            plusSix.firstElementChild.innerHTML = '6';
+            //logAction('battersRun', false, ballRuns);
+          } else if (ballRuns == 1) {
+            plusOne.firstElementChild.innerHTML = '1';
+            plusTwo.firstElementChild.innerHTML = '3';
+            plusFour.firstElementChild.innerHTML = '5';
+            plusSix.firstElementChild.innerHTML = '7';
+            logAction('battersRun', false, ballRuns);
+          } else if (ballRuns == 2) {
+            plusOne.firstElementChild.innerHTML = '3';
+            plusTwo.firstElementChild.innerHTML = '2';
+            plusFour.firstElementChild.innerHTML = '4';
+            plusSix.firstElementChild.innerHTML = '6';
+            logAction('battersRun', false, ballRuns);
+          } else if (ballRuns == 3) {
+            plusOne.firstElementChild.innerHTML = '1';
+            plusTwo.firstElementChild.innerHTML = '3';
+            plusFour.firstElementChild.innerHTML = '5';
+            plusSix.firstElementChild.innerHTML = '7';
+            logAction('battersRun', false, ballRuns);
+          } else if (ballRuns == 4) {
+            plusOne.firstElementChild.innerHTML = '5';
+            plusTwo.firstElementChild.innerHTML = '2';
+            plusFour.firstElementChild.innerHTML = '4';
+            plusSix.firstElementChild.innerHTML = '6';
+            logAction('batterHits', false, ballRuns);
+          } else if (ballRuns == 5) {
+            plusOne.firstElementChild.innerHTML = '1';
+            plusTwo.firstElementChild.innerHTML = '3';
+            plusFour.firstElementChild.innerHTML = '5';
+            plusSix.firstElementChild.innerHTML = '7';
+            logAction('battersRun', false, ballRuns);
+          } else if (ballRuns == 6) {
+            plusOne.firstElementChild.innerHTML = '7';
+            plusTwo.firstElementChild.innerHTML = '2';
+            plusFour.firstElementChild.innerHTML = '4';
+            plusSix.firstElementChild.innerHTML = '6';
+            logAction('battersRun', false, ballRuns);
+          } else if (ballRuns == 7) {
+            plusOne.firstElementChild.innerHTML = '7';
+            plusTwo.firstElementChild.innerHTML = '2';
+            plusFour.firstElementChild.innerHTML = '5';
+            plusSix.firstElementChild.innerHTML = '7';
+            logAction('battersRun', false, ballRuns);
+          } else if (ballRuns == 8) {
+            plusOne.firstElementChild.innerHTML = '7';
+            plusTwo.firstElementChild.innerHTML = '2';
+            plusFour.firstElementChild.innerHTML = '5';
+            plusSix.firstElementChild.innerHTML = '7';
+            logAction('battersRun', false, ballRuns);
+          } else if (ballRuns == 9) {
+            plusOne.firstElementChild.innerHTML = '7';
+            plusTwo.firstElementChild.innerHTML = '2';
+            plusFour.firstElementChild.innerHTML = '5';
+            plusSix.firstElementChild.innerHTML = '7';
+            logAction('battersRun', false, ballRuns);
+          }
+          if(isStrikingWicket) {
+            ctx.lineTo(strikersWicket.offsetLeft + (strikersWicket.offsetWidth/2) - ballEntryOffsetRight, 55 + 15);
+            logAction('strikersWicket', false, ballRuns);
+          } else if(isStrikingNonstrikersWicket) {
+            ctx.lineTo(nonstrikersWicket.offsetLeft + (nonstrikersWicket.offsetWidth/2) - ballEntryOffsetRight, 287);
+            logAction('nonstrikersWicket', false, ballRuns);
+          }
+          //Finally, where the touch is
+          ctx.lineTo(touches[0].pageX - el.offsetLeft, touches[0].pageY - el.offsetTop);
+          ctx.stroke();
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="ballEntry" class="hidden">
+    <div id="closeInfield" class="hidden">
+      <div id="field" class="fielders">
+        <div class="nudged hidden">FIELD</div>
+      </div>
+      <div id="wicketKeeper" class="fielders">
+        <div class="nudged hidden">KEEPER</div>
+      </div>
+    </div>
+    <div id="plusTwo" class="runs">
+        <div class="nudged hidden">2</div>
+    </div>
+    <div id="plusSix" class="runs">
+      <div class="nudged hidden">6</div>
+    </div>
+    <div id="plusFour" class="runs">
+      <div class="nudged hidden">4</div>
+    </div>
+    <div id="plusFourHint" class="hints" data-level="4" data-next-hint="wideHint" data-badge="4" data-reward="20"  data-description="Four!!! Okay, how about some bad balls from this bowler. First, a wide."><span class="material-icons">touch_app</span></div>
+    <div id="strikersWicket" class="wickets">|“|”|</div>
+    <div id="strikersCrease" class="hidden">
+      <div id="bye" class="byes">MISS</div>
+      <div id="striker" class="batters">
+        <div id="strikersName" class="nudged hidden batterName" data-batter-name="">
+        </div>
+      </div>
+      <div id="wicketKeeperHint" class="hints" data-level="2" data-next-hint="plusOneHint" data-badge="WK" data-reward="10" data-description="Fantastic! The poor batter was out for a duck! Let's get some runs on the board. Follow the arrow for a single."><span class="material-icons">touch_app</span></div>
+      <div id="legBye" class="byes">LEG</div>
+    </div>
+    <div id="sillyInfield" class="hidden">
+      <div id="plusThree" class="runs">
+        <div class="nudged hidden">+3</div>
+      </div>
+      <div id="plusOne" class="runs">
+        <div class="nudged hidden">1</div>
+      </div>
+      <div id="plusOneHint" class="hints stop-plusOne"  data-level="3" data-next-hint="plusFourHint" data-badge="1" data-reward="15" data-description="Phew, that must be a relief for the batter! Let's step it up and go for a boundary."><span class="material-icons">touch_app</span></div>
+    </div>
+    <div id="nonstrikersCrease" class="hidden">
+      <div id="noBall" class="wides">NO<br>BALL</div>
+      <div id="wide" class="wides">WIDE</div>
+      <div id="nonstrikersWicket" class="wickets">|“|”|</div>
+    </div>
+    <div id="straightUmpire" class="hidden">
+      <div id="nonstriker" class="batters offstrike">
+         <div id="nonstrikersName" class="halfNudged hidden batterName" data-batter-name=""></div></div>
+      <div id="bowler" class="">
+        <div class="nudged hidden bowlerName" id="bowlerName"></div>
+      </div>
+      <div id="bowlerPrevious" class="bowlerControls" onclick="incrementBowler(1);"><span class="material-icons">arrow_left</span></div>
+      <div id="bowlerNext" class="bowlerControls" onclick="incrementBowler(-1);"><span class="material-icons">arrow_right</span></div>
+      <div id="bowlerHint" class="hints" data-level="1" data-next-hint="wicketKeeperHint" data-badge="•" data-reward="5" data-description="A dot ball! That's a good start. What about a catch by the wicket keeper for your next ball?"><span class="material-icons">touch_app</span></div>
+      <div id="wideHint" class="hints"  data-level="5" data-next-hint="noBallHint" data-badge="WD" data-reward="20" data-description="Wow, that really was wide of the batter. Can the next ball be better?"><span class="material-icons">touch_app</span></div>
+      <div id="noBallHint" class="hints" data-level="6" data-next-hint="undoHint" data-badge="NB" data-reward="20" data-description="Oh no, another terrible delivery from the bowler, a no-ball. Why don't we correct that one using the undo button."><span class="material-icons">touch_app</span></div>
+    </div>
+    <div id="undoHint" class="hints" data-level="7" data-next-hint="" data-badge="x" data-reward="25" data-description="Excellent! Now you can correct balls! Let's make it a better ball for the bowler."><span class="material-icons">play_for_work</span></div>
+    <div id="levelDescription"></div>
+  </div>
+  
+  <canvas id="touchCanvas" width=360 height=360></canvas>
+  <div id="ballTrackers"></div>
+  <div id="battersScoreBoard" data-batters-score="0" data-wickets-fallen="0"><div class="hidden" id="battersScoreBoardEnd"></div></div>
+  <div id="battersScoreBoards"></div>
+  <div id="fieldersScoreBoard"></div>
+  <div id="thisBall"></div>
+  <div id="levels"></div>
+  <div id="home" onclick="showEntryModal();"><span class="material-icons">home</span></div>
+  <div id="color" onclick="pickColor();"><span class="material-icons">settings_accessibility</span></div>
+  <div id="report" onclick="" class="autohide"><span class="material-icons">report</span>
+  </div>
+  <div id="shareBowlers" onclick="clickShareBowlers()"><span class="material-icons">share</span></div>
+  <div id="shareBatters" onclick="clickShareBatters()"><span class="material-icons">share</span></div>
+  <div id="switch" onclick="swapBatters(true);"><span class="material-icons">import_export</span>
+  </div>
+  <div id="undo" onclick="undoBall();"><span class="material-icons">backspace</span>
+  </div>
+  <!-->Modals</-->
+  <div id="modalOverlay" onclick="hideModals();">
+    
+  </div>
+  <div id="bowlerModal" class="modals" data-modal-title="Edit Bowlers">
+    <div class="closeIcons" onclick="hideModals();"><span class="material-icons">done</span></div>
+    <div id="bowlerTextEntryContainer"><input type="text" id="bowlerTextEntry"></div>
+  </div>
+  <div id="batterModal" class="modals" data-modal-title="Edit Batters">
+    <div class="closeIcons" onclick="hideModals();"><span class="material-icons">done</span></div>
+    <div id="batterTextEntryContainer"><input type="text" id="batterTextEntry"></div>
+  </div>
+  <div id="ballModal" class="modals" data-modal-title="Ball details">
+    <div id="ballModalBall" class="closeIcons" onclick="hideModals();"></div>
+    <div id="ballDetails"></div>
+  </div>
+  <div id="colorModal"></div>
+  <div id="shareModal" class="modals" data-modal-title="Share details">
+    <div id="shareDetails"></div>
+  </div>
+    <div id="entryModal" class="modals" data-modal-title="Scratch Match">
+    <div id="entryResumeButton" dataset-mode="">
+      <div id="resume" onclick="hideModals();"><span class="material-icons">play_arrow</span>
+      </div>
+    </div>
+    <div id="entrySwapButton">
+      <div id="inning" onclick="swapInnings();"><span class="material-icons">compare_arrows</span>
+      </div>
+    </div>
+    <div id="entryNewPairsButton">
+      <div id="newPairs" onclick="newMatch('Pairs');"><span class="material-icons">library_add</span>
+      </div>
+    </div>
+    <div id="entryNewNoReplayButton">
+      <div id="newNoReplay" onclick="newMatch('No Replay');"><span class="material-icons">healing</span>
+      </div>
+    </div>
+        <div id="entryNewHundredButton">
+      <div id="newHundred" onclick="newMatch('Hundred');"><span class="material-icons">money</span>
+      </div>
+    </div>
+        <div id="entryNewButton">
+      <div id="new" onclick="newMatch('Standard');"><span class="material-icons">add_box</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
